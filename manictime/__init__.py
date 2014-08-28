@@ -17,11 +17,9 @@ class ManicTimeRow(object):
 
     @property
     def issue(self):
-        if not self.get_issue_id():
-            self._issue = False
-        if self._issue is None:
+        if not isinstance(self._issue, youtrack.Issue):
             try:
-                result = self.connection.get_issue(self.get_issue_id())
+                result = self.connection.get_issue(self.get_issue_id_from_tags())
                 if result:
                     self._issue = result
                 else:
@@ -32,30 +30,51 @@ class ManicTimeRow(object):
 
     @property
     def project(self):
-        if self._project is None:
-            result = self.connection.getProject(self.get_project_id())
+        if not isinstance(self._project, youtrack.Project):
+            result = self.connection.getProject(self.get_project_id_from_tags())
             if result:
                 self._project = result
             else:
                 self._project = False
         return self._project
 
-    def issue_exists(self):
-        issue = self.issue
-        if issue:
+    @issue.setter
+    def x(self, issue):
+        if isinstance(issue, youtrack.Issue):
+            self._project = issue
             return True
         else:
             return False
+
+    @project.setter
+    def x(self, project):
+        if isinstance(project, youtrack.Project):
+            self._project = project
+            return True
+        else:
+            return False
+
+    def project_exists(self):
+        return isinstance(self.project, youtrack.Project)
+
+    def issue_exists(self):
+        return isinstance(self.issue, youtrack.Issue)
 
     def get_field(self, field_key):
         if field_key in self.data:
             return self.data[field_key]
         return None
 
+    def set_field(self, field_key, field_value):
+        if field_key in self.data:
+            self.data[field_key] = field_value
+            return True
+        return False
+
     def get_tags(self):
         return self.get_field('Name')
 
-    def get_issue_id(self):
+    def get_issue_id_from_tags(self):
         tags = self.get_tags()
         if not tags:
             return None
@@ -67,13 +86,34 @@ class ManicTimeRow(object):
         else:
             return None
 
-    def get_project_id(self):
+    def get_project_id_from_tags(self):
         issue_id = self.get_issue_id()
         if issue_id:
             splits = issue_id.split('-')
             return splits[0]
         else:
             return None
+
+    def get_issue_id(self):
+        if isinstance(self.issue, youtrack.Issue):
+            return self.issue.id
+        else:
+            return self.get_issue_id_from_tags()
+
+    def get_project_id(self):
+        if isinstance(self.project, youtrack.Project):
+            return self.project.id
+        issue_id = self.get_issue_id()
+        if issue_id:
+            splits = issue_id.split('-')
+            return splits[0]
+        else:
+            return None
+
+    def search_issue(self, filter):
+        project_id = self.get_project_id()
+        issues = self.connection.getIssues(project_id, filter, 0, 20)
+        return issues
 
     def get_duration(self):
         return self.get_field('Duration')
