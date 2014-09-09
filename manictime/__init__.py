@@ -8,7 +8,9 @@ import re
 import youtrack
 
 
-class ManicTimeRow(object):
+class Row(object):
+    datetime_format = "%d/%m/%Y %H:%M:%S"
+
     def __init__(self, connection, data):
         self.connection = connection
         self.data = data
@@ -160,10 +162,10 @@ class ManicTimeRow(object):
         date_string = self.get_start()
         date = None
         if date_string:
-            date = datetime.datetime.strptime(date_string, "%d/%m/%Y %H:%M:%S")
+            date = datetime.datetime.strptime(date_string, self.datetime_format)
         return date
 
-    def get_date_string(self, date_format):
+    def get_date_string(self, date_format="%Y-%m-%d"):
         if not date_format:
             date_format = "%Y-%m-%d"
         date = self.get_date_object()
@@ -227,6 +229,23 @@ class ManicTimeRow(object):
             self.get_description()]
 
         return " / ".join(string_list)
+
+
+class ManicTimeRow(Row):
+    datetime_format = "%d/%m/%Y %H:%M:%S"
+
+    def get_tags(self):
+        return self.get_field('Name')
+
+    def get_duration(self):
+        return self.get_field('Duration')
+
+    def get_start(self):
+        return self.get_field('Start')
+
+    def get_description(self):
+        return self.get_field("Notes")
+
 
 if __name__ == '__main__':
 
