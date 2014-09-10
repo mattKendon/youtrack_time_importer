@@ -11,7 +11,7 @@ __author__ = 'Matthew'
 class TestTogglRow(TestCase):
     def setUp(self):
         connection = Connection("http://tracker.outlandishideas.co.uk", "matt", "strangeCharm")
-        with codecs.open('TogglData.csv', 'rU') as fp:
+        with codecs.open('TogglData.csv', 'rU', encoding='utf-8-sig') as fp:
             rows = csv.DictReader(fp)
             for row in rows:
                 self.tr = TogglRow(connection, row)
