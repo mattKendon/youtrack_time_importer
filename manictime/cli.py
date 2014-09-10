@@ -4,7 +4,6 @@ from dateutil.parser import parse as date_parse
 import datetime
 from youtrack.connection import Connection
 import csv
-import re
 import youtrack as yt
 from manictime import ManicTimeRow
 
@@ -107,6 +106,7 @@ def manictime(url, username, password, filename):
             # ignore
             print("  Timeslip ignored")
     print("Added " + str(count) + " timeslips out of " + str(total))
+
 
 def process_row(row):
     # if ignore exists in tags, return False
