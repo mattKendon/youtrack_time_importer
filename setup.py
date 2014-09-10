@@ -12,6 +12,6 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        yourscript=manictime.cli:youtrack
+        youtrack=manictime.cli:youtrack
     ''',
 )
