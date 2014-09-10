@@ -73,6 +73,13 @@ class Row(object):
             return True
         return False
 
+    def is_ignored(self):
+        match = re.search("ignore", self.get_tags(), re.IGNORECASE)
+        if match:
+            return True
+        else:
+            return False
+
     def get_tags(self):
         return self.get_field('Name')
 
