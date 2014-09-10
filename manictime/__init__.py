@@ -247,6 +247,22 @@ class ManicTimeRow(Row):
         return self.get_field("Notes")
 
 
+class TogglRow(Row):
+    datetime_format = "%d/%m/%Y %H:%M:%S"
+
+    def get_tags(self):
+        return self.get_field('Name')
+
+    def get_duration(self):
+        return self.get_field('Duration')
+
+    def get_start(self):
+        return self.get_field('Start')
+
+    def get_description(self):
+        return self.get_field("Notes")
+
+
 if __name__ == '__main__':
 
     url = input("Enter in the YouTrack Url (http://tracker.outlandishideas.co.uk): ")
