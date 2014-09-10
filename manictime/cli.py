@@ -155,10 +155,11 @@ def process_row(row):
             if isinstance(issue, youtrack.Issue):
                 row.issue = issue
             else:
-                print("    Count not fin isue with id of " + issue_id + ". Please try again.")
+                print("    Could not find issue with id of " + issue_id + ". Please try again.")
                 continue
     # if we ever get to ignore Row
     return False
+
 
 def get_connection(url, username, password):
     try:
