@@ -248,19 +248,21 @@ class ManicTimeRow(Row):
 
 
 class TogglRow(Row):
-    datetime_format = "%d/%m/%Y %H:%M:%S"
+    datetime_format = "%Y-%m-%d %H:%M:%S"
 
     def get_tags(self):
-        return self.get_field('Name')
+        return self.get_field('Tags')
 
     def get_duration(self):
         return self.get_field('Duration')
 
     def get_start(self):
-        return self.get_field('Start')
+        date = self.get_field('Start date')
+        time = self.get_field('Start time')
+        return date + " " + time
 
     def get_description(self):
-        return self.get_field("Notes")
+        return self.get_field("Description")
 
 
 if __name__ == '__main__':
