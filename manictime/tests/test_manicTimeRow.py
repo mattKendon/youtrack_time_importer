@@ -136,8 +136,3 @@ class TestManicTimeRow(TestCase):
         self.assertEqual(result.date, self.mtr.get_date_as_unix_time_milliseconds())
         self.assertEqual(result.duration, self.mtr.get_duration_as_minutes())
         self.assertEqual(result.description, self.mtr.get_description())
-
-    def test_save(self):
-        self.mtr.data['Name'] = "TP, TP-12"
-        result = self.mtr.save()
-        print(result)
