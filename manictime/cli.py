@@ -34,11 +34,11 @@ def report(url, username, password, from_date_string, to_date_string):
     project_ids = connection.getProjectIds()
     filter_string = "updated: " + from_date.strftime("%Y-%m-%d") + " .. " + to_date.strftime("%Y-%m-%d")
     report_items = []
-    for id in project_ids:
+    for project_id in project_ids:
         try:
-            issues = connection.getIssues(id, filter_string, 0, 9999)
+            issues = connection.getIssues(project_id, filter_string, 0, 9999)
         except yt.YouTrackException as e:
-            print("Cannot read issues for project " + id)
+            print("Cannot read issues for project " + project_id)
             continue
         for issue in issues:
             work_items = connection.getWorkItems(issue.id)
@@ -69,8 +69,6 @@ def report(url, username, password, from_date_string, to_date_string):
             str(datetime.timedelta(minutes=int(item.duration)))
         ]
         print("  " + " - ".join(message))
-
-
 
 
 @youtrack.command()
