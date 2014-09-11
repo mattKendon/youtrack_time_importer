@@ -8,6 +8,7 @@ from youtrack.connection import Connection
 import csv
 import youtrack as yt
 from manictime import ManicTimeRow
+from manictime import TogglRow
 import configparser
 
 
@@ -33,9 +34,9 @@ def config(verbose):
 @config.command()
 @click.argument('property', nargs=1)
 @click.argument('value', nargs=1)
-def add(property, value):
+def add(option, value):
     config = extract_config()
-    properties = property.split(".")
+    properties = option.split(".")
     section = properties[0]
     option = properties[1]
     if section not in config.sections():
@@ -59,9 +60,13 @@ def config_path():
 @click.option('-u', '--url')
 @click.option('-n', '--username')
 @click.option('-p', '--password')
+@click.argument('name', nargs=1)
 @click.argument('from_date_string', nargs=1)
 @click.argument('to_date_string', nargs=1)
-def report(url, username, password, from_date_string, to_date_string):
+def report(url, username, password, name, from_date_string, to_date_string):
+    url = get_url(url)
+    username = get_username(username)
+    password = get_password(password)
     try:
         from_date = date_parse(from_date_string)
         to_date = date_parse(to_date_string)
@@ -80,12 +85,11 @@ def report(url, username, password, from_date_string, to_date_string):
         except yt.YouTrackException as e:
             print("Cannot read issues for project " + project_id)
             continue
-        print(len(issues))
         for issue in issues:
             work_items = connection.getWorkItems(issue.id)
             for item in work_items:
                 item_date = datetime.datetime.utcfromtimestamp(int(item.date)/1000)
-                if item.authorLogin == username \
+                if item.authorLogin == name \
                         and item_date.strftime("%Y-%m-%d") >= from_date.strftime("%Y-%m-%d") \
                         and item_date.strftime("%Y-%m-%d") <= to_date.strftime("%Y-%m-%d"):
                     report_items.append(item)
@@ -119,6 +123,9 @@ def report(url, username, password, from_date_string, to_date_string):
 @click.argument('filename', type=click.File('rU', 'utf-8-sig'))
 def manictime(url, username, password, filename):
 
+    url = get_url(url)
+    username = get_username(username)
+    password = get_password(password)
     connection = get_connection(url, username, password)
 
     try:
@@ -136,7 +143,45 @@ def manictime(url, username, password, filename):
             # save
             if not row.timeslip_exists():
                 count += 1
-                # row.save()
+                row.save()
+                print("    uploaded timeslip")
+            else:
+                print("  Timeslip for " + row.get_issue_id() + " (" +
+                      row.timeslip_string() + ") already exists")
+        else:
+            # ignore
+            print("  Timeslip ignored")
+    print("Added " + str(count) + " timeslips out of " + str(total))
+
+
+@youtrack.command()
+@click.option('-u', '--url')
+@click.option('-n', '--username')
+@click.option('-p', '--password')
+@click.argument('filename', type=click.File('rU', 'utf-8-sig'))
+def toggl(url, username, password, filename):
+
+    url = get_url(url)
+    username = get_username(username)
+    password = get_password(password)
+    connection = get_connection(url, username, password)
+
+    try:
+        rows = csv.DictReader(filename)
+        print("Importing timeslips")
+    except csv.Error as e:
+        exit("Could not find file")
+
+    count = 0
+    total = 0
+    for row in rows:
+        total += 1
+        row = TogglRow(connection, row)
+        if process_row(row):
+            # save
+            if not row.timeslip_exists():
+                count += 1
+                row.save()
                 print("    uploaded timeslip")
             else:
                 print("  Timeslip for " + row.get_issue_id() + " (" +
@@ -211,17 +256,29 @@ def get_setting(setting):
     return False
 
 
-def get_connection(url, username, password):
+def get_url(url):
     if not url:
         url = get_setting('connection.url')
         if not url:
             url = input("Enter in your Youtrack server: ")
+    return url
+
+
+def get_username(username):
     if not username:
         username = get_setting('connection.user')
         if not username:
             username = input("Enter in your YouTrack username: ")
+    return username
+
+
+def get_password(password):
     if not password:
         password = input("Enter in your YouTrack password: ")
+    return password
+
+
+def get_connection(url, username, password):
     try:
         return Connection(url, username, password)
     except yt.YouTrackException as e:
