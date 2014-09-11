@@ -56,9 +56,9 @@ def config_path():
     return os.path.join(click.get_app_dir("YouTrack"), 'config.ini')
 
 @youtrack.command()
-@click.option('-u', '--url', prompt="Enter in your Youtrack server")
-@click.option('-n', '--username', prompt="Enter in your YouTrack username")
-@click.option('-p', '--password', prompt="Enter in your YouTrack password")
+@click.option('-u', '--url')
+@click.option('-n', '--username')
+@click.option('-p', '--password')
 @click.argument('from_date_string', nargs=1)
 @click.argument('to_date_string', nargs=1)
 def report(url, username, password, from_date_string, to_date_string):
@@ -80,6 +80,7 @@ def report(url, username, password, from_date_string, to_date_string):
         except yt.YouTrackException as e:
             print("Cannot read issues for project " + project_id)
             continue
+        print(len(issues))
         for issue in issues:
             work_items = connection.getWorkItems(issue.id)
             for item in work_items:
@@ -112,9 +113,9 @@ def report(url, username, password, from_date_string, to_date_string):
 
 
 @youtrack.command()
-@click.option('-u', '--url', prompt="Enter in your Youtrack server")
-@click.option('-n', '--username', prompt="Enter in your YouTrack username")
-@click.option('-p', '--password', prompt="Enter in your YouTrack password")
+@click.option('-u', '--url')
+@click.option('-n', '--username')
+@click.option('-p', '--password')
 @click.argument('filename', type=click.File('rU', 'utf-8-sig'))
 def manictime(url, username, password, filename):
 
@@ -199,7 +200,28 @@ def process_row(row):
     return False
 
 
+def get_setting(setting):
+    configFile = extract_config()
+    properties = setting.split(".")
+    section = properties[0]
+    option = properties[1]
+    if section in configFile.sections():
+        if option in configFile[section]:
+            return configFile[section][option]
+    return False
+
+
 def get_connection(url, username, password):
+    if not url:
+        url = get_setting('connection.url')
+        if not url:
+            url = input("Enter in your Youtrack server: ")
+    if not username:
+        username = get_setting('connection.user')
+        if not username:
+            username = input("Enter in your YouTrack username: ")
+    if not password:
+        password = input("Enter in your YouTrack password: ")
     try:
         return Connection(url, username, password)
     except yt.YouTrackException as e:
