@@ -1,4 +1,6 @@
 __author__ = 'Matthew'
+import json
+import sys, os
 import click
 from dateutil.parser import parse as date_parse
 import datetime
@@ -6,6 +8,7 @@ from youtrack.connection import Connection
 import csv
 import youtrack as yt
 from manictime import ManicTimeRow
+import configparser
 
 
 class Messages(object):
@@ -14,6 +17,43 @@ class Messages(object):
 @click.group()
 def youtrack():
     pass
+
+
+@youtrack.group(invoke_without_command=True)
+@click.option('-v', '--verbose', count=True)
+def config(verbose):
+    if verbose:
+        config = extract_config()
+        for section in config.sections():
+            print("[%s]" % section)
+            for option in config[section]:
+                print(option, "=", config[section][option])
+            print("")
+
+@config.command()
+@click.argument('property', nargs=1)
+@click.argument('value', nargs=1)
+def add(property, value):
+    config = extract_config()
+    properties = property.split(".")
+    section = properties[0]
+    option = properties[1]
+    if section not in config.sections():
+        config[section] = {}
+    config[section][option] = value
+    with open(config_path(), 'w+') as fp:
+        config.write(fp)
+
+
+def extract_config():
+    cfg = config_path()
+    parser = configparser.ConfigParser()
+    parser.read([cfg])
+    return parser
+
+
+def config_path():
+    return os.path.join(click.get_app_dir("YouTrack"), 'config.ini')
 
 @youtrack.command()
 @click.option('-u', '--url', prompt="Enter in your Youtrack server")
