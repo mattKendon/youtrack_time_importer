@@ -21,7 +21,7 @@ class Row(object):
     def issue(self):
         if not isinstance(self._issue, youtrack.Issue):
             try:
-                result = self.connection.get_issue(self.get_issue_id_from_tags())
+                result = self.connection.get_issue(str(self.get_issue_id_from_tags()))
                 if result:
                     self._issue = result
                 else:
