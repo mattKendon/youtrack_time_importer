@@ -12,87 +12,129 @@ from manictime import TogglRow
 import configparser
 
 
-class Messages(object):
-    pass
-
-@click.group()
-def youtrack():
-    pass
-
-
-@youtrack.group(invoke_without_command=True)
-@click.option('-v', '--verbose', count=True)
-def config(verbose):
-    if verbose:
-        config = extract_config()
-        for section in config.sections():
-            print("[%s]" % section)
-            for option in config[section]:
-                print(option, "=", config[section][option])
-            print("")
-
-@config.command()
-@click.argument('property', nargs=1)
-@click.argument('value', nargs=1)
-def add(option, value):
-    config = extract_config()
-    properties = option.split(".")
-    section = properties[0]
-    option = properties[1]
-    if section not in config.sections():
-        config[section] = {}
-    config[section][option] = value
-    with open(config_path(), 'w+') as fp:
-        config.write(fp)
-
-
-def extract_config():
-    cfg = config_path()
-    parser = configparser.ConfigParser()
-    parser.read([cfg])
-    return parser
-
-
 def config_path():
+    path = click.get_app_dir("YouTrack")
+    if not os.path.exists(path):
+        os.mkdir(path)
     return os.path.join(click.get_app_dir("YouTrack"), 'config.ini')
 
-@youtrack.command()
+
+def read_config():
+    try:
+        cfg = config_path()
+        parser = configparser.ConfigParser()
+        parser.read([cfg])
+        return parser
+    except configparser.Error as e:
+        exit(e.message)
+
+
+@click.group()
 @click.option('-u', '--url')
 @click.option('-n', '--username')
 @click.option('-p', '--password')
+@click.pass_context
+def youtrack(ctx, url, username, password):
+    """ adds config file to Context and starts connection
+
+    This will only start the connection if the subcommand is not config
+    :param ctx:
+    :return:
+    """
+    ctx.obj = dict()
+    cfg = read_config()
+    ctx.obj['config'] = cfg
+    if not ctx.invoked_subcommand == 'config':
+        if not (url and username) \
+                and not (cfg.has_option('connection', 'url')
+                         or cfg.has_option('connection', 'username')):
+            click.echo("No configuration set for connection to YouTrack. "
+                       "Please add your url and username to the config by using the following commands:")
+            click.echo()
+            click.echo("youtrack config add connection.username <username>")
+            click.echo("youtrack config add connection.url <url>")
+            click.echo()
+            ctx.exit(-1)
+        if not password:
+            password = click.prompt("Please enter the password for the YouTrack user {0}".format(username), hide_input=True)
+        try:
+            connection = Connection(url, username, password)
+            ctx.obj['connection'] = connection
+        except yt.YouTrackException as e:
+            ctx.fail(e)
+
+
+@youtrack.group(invoke_without_command=True)
+@click.pass_context
+def config(ctx):
+    """view command for config if no subcommand called"""
+    if not ctx.invoked_subcommand:
+        cfg = ctx.obj['config']
+        for section in cfg.sections():
+            print("[", section, "]")
+            for option in cfg[section]:
+                print(option, " = ", cfg[section][option])
+
+
+@config.command()
+@click.argument('option', nargs=1)
+@click.argument('value', nargs=1)
+@click.pass_context
+def add(ctx, option, value):
+    """command to add or update a parameter in the config
+
+    Keyword arguments:
+    option -- should include section with dot notation (eg. section.option)
+    value -- the value of the option
+    """
+    properties = option.split(".")
+    section = properties[0]
+    option = properties[1]
+    cfg = ctx.obj['config']
+    if not cfg.has_section(section):
+        cfg.add_section(section)
+    cfg.set(section, option, value)
+    with open(config_path(), 'w') as fp:
+        cfg.write(fp)
+
+
+@youtrack.command()
 @click.argument('name', nargs=1)
 @click.argument('from_date_string', nargs=1)
 @click.argument('to_date_string', nargs=1)
-def report(url, username, password, name, from_date_string, to_date_string):
-    url = get_url(url)
-    username = get_username(username)
-    password = get_password(password)
+@click.pass_context
+def report(ctx, name, from_date_string, to_date_string):
+
     try:
-        from_date = date_parse(from_date_string)
-        to_date = date_parse(to_date_string)
+        from_date_string = date_parse(from_date_string).strftime("%Y-%m-%d")
+        to_date_string = date_parse(to_date_string).strftime("%Y-%m-%d")
     except:
-        exit("Could not convert one or more date strings. Please use a recognised format such as YYYY-MM-DD")
+        ctx.fail("Could not convert one or more date strings. "
+                 "Please use a recognised format such as YYYY-MM-DD")
 
     #get connection to youtrack
-    connection = get_connection(url, username, password)
+    connection = ctx.obj['connection']
+
+    #filter string
+    filter_string = ""
+
     #get project ids and loop through them
     project_ids = connection.getProjectIds()
-    filter_string = "updated: " + from_date.strftime("%Y-%m-%d") + " .. " + to_date.strftime("%Y-%m-%d")
     report_items = []
-    for project_id in project_ids:
-        try:
-            issues = connection.getIssues(project_id, filter_string, 0, 9999)
-        except yt.YouTrackException as e:
-            print("Cannot read issues for project " + project_id)
-            continue
-        for issue in issues:
-            work_items = connection.getWorkItems(issue.id)
-            for item in work_items:
-                item_date = datetime.datetime.utcfromtimestamp(int(item.date)/1000)
-                if item.authorLogin == name \
-                        and item_date.strftime("%Y-%m-%d") >= from_date.strftime("%Y-%m-%d") \
-                        and item_date.strftime("%Y-%m-%d") <= to_date.strftime("%Y-%m-%d"):
-                    report_items.append(item)
+    click.echo("Searching {0} projects for tasks that you've worked on".format(len(project_ids)))
+    with click.progressbar(project_ids) as bar:
+        for project_id in bar:
+            try:
+                issues = connection.getIssues(project_id, filter_string, 0, 9999)
+            except yt.YouTrackException as e:
+                continue
+            for issue in issues:
+                work_items = connection.getWorkItems(issue.id)
+                for item in work_items:
+                    item_date_string = datetime.datetime.utcfromtimestamp(int(item.date)/1000).strftime("%Y-%m-%d")
+                    if item.authorLogin == name \
+                            and from_date_string <= item_date_string <= to_date_string:
+                        report_items.append(item)
     report_items.sort(key=lambda work_item: work_item.date)
     previous_date = None
     for item in report_items:
@@ -117,9 +159,6 @@ def report(url, username, password, name, from_date_string, to_date_string):
 
 
 @youtrack.command()
-@click.option('-u', '--url')
-@click.option('-n', '--username')
-@click.option('-p', '--password')
 @click.argument('filename', type=click.File('rU', 'utf-8-sig'))
 def manictime(url, username, password, filename):
 
@@ -155,9 +194,6 @@ def manictime(url, username, password, filename):
 
 
 @youtrack.command()
-@click.option('-u', '--url')
-@click.option('-n', '--username')
-@click.option('-p', '--password')
 @click.argument('filename', type=click.File('rU', 'utf-8-sig'))
 def toggl(url, username, password, filename):
 
