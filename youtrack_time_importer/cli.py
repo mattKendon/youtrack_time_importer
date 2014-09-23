@@ -7,8 +7,8 @@ import datetime
 from youtrack.connection import Connection
 import csv
 import youtrack as yt
-from manictime import ManicTimeRow
-from manictime import TogglRow
+from youtrack_time_importer import ManicTimeRow
+from youtrack_time_importer import TogglRow
 import configparser
 
 

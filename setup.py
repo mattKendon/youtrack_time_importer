@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='manictime',
+    name='youtrack_time_importer',
     version='0.1',
     packages=find_packages(),
     include_package_data=True,
@@ -12,6 +12,6 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        youtrack=manictime.cli:youtrack
+        youtrack=youtrack_time_importer.cli:youtrack
     ''',
 )

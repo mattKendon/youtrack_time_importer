@@ -1,5 +1,5 @@
 from unittest import TestCase
-from manictime import ManicTimeRow
+from youtrack_time_importer import ManicTimeRow
 from youtrack.connection import Connection
 import youtrack
 import datetime
@@ -11,7 +11,7 @@ __author__ = 'Matthew'
 class TestManicTimeRow(TestCase):
     def setUp(self):
         connection = Connection("http://tracker.outlandishideas.co.uk", "matt", "strangeCharm")
-        with codecs.open('ManicTimeData.csv', 'rU', encoding='utf-8-sig') as fp:
+        with codecs.open('test_data/ManicTimeData.csv', 'rU', encoding='utf-8-sig') as fp:
             rows = csv.DictReader(fp)
             for row in rows:
                 self.mtr = ManicTimeRow(connection, row)
