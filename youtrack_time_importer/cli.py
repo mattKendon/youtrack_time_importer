@@ -1,5 +1,5 @@
 __author__ = 'Matthew'
-import json
+
 import sys, os
 import click
 from dateutil.parser import parse as date_parse
@@ -160,12 +160,10 @@ def report(ctx, name, from_date_string, to_date_string):
 
 @youtrack.command()
 @click.argument('filename', type=click.File('rU', 'utf-8-sig'))
-def manictime(url, username, password, filename):
+@click.pass_context
+def manictime(ctx, filename):
 
-    url = get_url(url)
-    username = get_username(username)
-    password = get_password(password)
-    connection = get_connection(url, username, password)
+    connection = ctx.obj['connection']
 
     try:
         rows = csv.DictReader(filename)
@@ -195,12 +193,10 @@ def manictime(url, username, password, filename):
 
 @youtrack.command()
 @click.argument('filename', type=click.File('rU', 'utf-8-sig'))
-def toggl(url, username, password, filename):
+@click.pass_context
+def toggl(ctx, filename):
 
-    url = get_url(url)
-    username = get_username(username)
-    password = get_password(password)
-    connection = get_connection(url, username, password)
+    connection = ctx.obj['connection']
 
     try:
         rows = csv.DictReader(filename)
@@ -220,12 +216,11 @@ def toggl(url, username, password, filename):
                 row.save()
                 print("    uploaded timeslip")
             else:
-                print("  Timeslip for " + row.get_issue_id() + " (" +
-                      row.timeslip_string() + ") already exists")
+                print("  Timeslip for {0} ({1}) already exists".format(row.get_issue_id(), row.timeslip_string()))
         else:
             # ignore
             print("  Timeslip ignored")
-    print("Added " + str(count) + " timeslips out of " + str(total))
+    print("Added {0} timeslips out of {1}.".format(count, total))
 
 
 def process_row(row):
@@ -236,9 +231,9 @@ def process_row(row):
     if row.issue_exists():
         return True
     # if issue does not exist lets prompt the user
-    response = input("  No Issue found for \"" + row.get_tags() + "\". Add to an issue? (y/n): ")
+    response = click.confirm("  No Issue found for \"{0}\". Add to an issue? (y/n)".format(row.get_tags()))
     # if they respond "n" return False
-    if response.strip() == "n":
+    if not response:
         return False
     # if they want to go ahead start loop
     while True:
@@ -247,9 +242,8 @@ def process_row(row):
             return True
         # lets get a project from them
         if not row.project_exists():
-            message = "  Enter Project Id for " + row.timeslip_string()
-            message += " (Leave blank to skip this timeslip): "
-            project_id = input(message)
+            message = "  Enter Project Id for {0} (Leave blank to skip this timeslip)"
+            project_id = click.prompt(message.format(row.timeslip_string()))
             # if left blank, ignore row
             if project_id == "":
                 return False
@@ -260,13 +254,12 @@ def process_row(row):
                 row.project = project
             # else tell the user and try again
             else:
-                print("    Could not find project with " + project_id + ". Please try again.")
+                click.echo("    Could not find project with {0}. Please try again.".format(project_id))
                 continue
         # if we have a project lets try get an issue
         else:
-            message = "  Enter Issue Id for " + row.timeslip_string()
-            message += " (Leave blank to skip this timeslip): "
-            issue_id = input(message)
+            message = "  Enter Issue Id for {0} (Leave blank to skip this timeslip)"
+            issue_id = click.prompt(message.format(row.timeslip_string()))
             # if left blank ignore row
             if issue_id == "":
                 return False
@@ -275,50 +268,10 @@ def process_row(row):
             if isinstance(issue, youtrack.Issue):
                 row.issue = issue
             else:
-                print("    Could not find issue with id of " + issue_id + ". Please try again.")
+                click.echo("    Could not find issue with id of {0}. Please try again.".format(issue_id))
                 continue
     # if we ever get to ignore Row
     return False
-
-
-def get_setting(setting):
-    configFile = extract_config()
-    properties = setting.split(".")
-    section = properties[0]
-    option = properties[1]
-    if section in configFile.sections():
-        if option in configFile[section]:
-            return configFile[section][option]
-    return False
-
-
-def get_url(url):
-    if not url:
-        url = get_setting('connection.url')
-        if not url:
-            url = input("Enter in your Youtrack server: ")
-    return url
-
-
-def get_username(username):
-    if not username:
-        username = get_setting('connection.user')
-        if not username:
-            username = input("Enter in your YouTrack username: ")
-    return username
-
-
-def get_password(password):
-    if not password:
-        password = input("Enter in your YouTrack password: ")
-    return password
-
-
-def get_connection(url, username, password):
-    try:
-        return Connection(url, username, password)
-    except yt.YouTrackException as e:
-        exit("Could not connect to YouTrack")
 
 
 if __name__ == "__main__":
