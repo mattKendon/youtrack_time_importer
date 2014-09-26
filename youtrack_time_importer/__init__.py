@@ -21,7 +21,7 @@ class Row(object):
     def issue(self):
         if not isinstance(self._issue, youtrack.Issue):
             try:
-                result = self.connection.get_issue(str(self.get_issue_id_from_tags()))
+                result = self.connection.get_issue(str(self.get_issue_id_from_tags(self.get_issue_string())))
                 if result:
                     self._issue = result
                 else:
@@ -80,15 +80,17 @@ class Row(object):
         else:
             return False
 
+    def get_issue_string(self):
+        return self.get_tags()
+
     def get_tags(self):
         return self.get_field('Name')
 
-    def get_issue_id_from_tags(self):
-        tags = self.get_tags()
-        if not tags:
+    def get_issue_id_from_tags(self, issue_string):
+        if not issue_string:
             return None
         pattern = '(?P<issue_id>[a-zA-Z0-9]*\-[0-9]+)'
-        match = re.search(pattern, tags)
+        match = re.search(pattern, issue_string)
         if match:
             issue_id = match.group('issue_id')
             return issue_id
@@ -107,7 +109,7 @@ class Row(object):
         if isinstance(self.issue, youtrack.Issue):
             return self.issue.id
         else:
-            return self.get_issue_id_from_tags()
+            return self.get_issue_id_from_tags(self.get_issue_string())
 
     def get_project_id(self):
         if isinstance(self.project, youtrack.Project):
@@ -270,6 +272,9 @@ class TogglRow(Row):
 
     def get_description(self):
         return self.get_field("Description")
+
+    def get_issue_string(self):
+        return self.get_description() + " " + self.get_tags()
 
 
 if __name__ == '__main__':
