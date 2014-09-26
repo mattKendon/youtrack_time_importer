@@ -41,20 +41,14 @@ class Row(object):
         return self._project
 
     @issue.setter
-    def x(self, issue):
+    def issue(self, issue):
         if isinstance(issue, youtrack.Issue):
-            self._project = issue
-            return True
-        else:
-            return False
+            self._issue = issue
 
     @project.setter
-    def x(self, project):
+    def project(self, project):
         if isinstance(project, youtrack.Project):
             self._project = project
-            return True
-        else:
-            return False
 
     def project_exists(self):
         return isinstance(self.project, youtrack.Project)

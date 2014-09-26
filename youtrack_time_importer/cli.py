@@ -10,6 +10,7 @@ import youtrack as yt
 from youtrack_time_importer import ManicTimeRow
 from youtrack_time_importer import TogglRow
 import configparser
+from requests.exceptions import ConnectionError
 
 
 def config_path():
@@ -45,9 +46,13 @@ def youtrack(ctx, url, username, password):
     cfg = read_config()
     ctx.obj['config'] = cfg
     if not ctx.invoked_subcommand == 'config':
-        if not (url and username) \
-                and not (cfg.has_option('connection', 'url')
-                         or cfg.has_option('connection', 'username')):
+
+        if not url and cfg.has_option('connection', 'url'):
+            url = cfg.get('connection', 'url')
+        if not username and cfg.has_option('connection', 'url'):
+            username = cfg.get('connection', 'username')
+
+        if not url and not username:
             click.echo("No configuration set for connection to YouTrack. "
                        "Please add your url and username to the config by using the following commands:")
             click.echo()
@@ -61,6 +66,8 @@ def youtrack(ctx, url, username, password):
             connection = Connection(url, username, password)
             ctx.obj['connection'] = connection
         except yt.YouTrackException as e:
+            ctx.fail(e)
+        except ConnectionError as e:
             ctx.fail(e)
 
 
@@ -234,7 +241,7 @@ def process_row(row):
     if row.issue_exists():
         return True
     # if issue does not exist lets prompt the user
-    response = click.confirm("  No Issue found for \"{0}\". Add to an issue? (y/n)".format(row.get_tags()))
+    response = click.confirm("  No Issue found for \"{0}\". Add to an issue?".format(row.get_issue_string()))
     # if they respond "n" return False
     if not response:
         return False
@@ -267,12 +274,15 @@ def process_row(row):
             if issue_id == "":
                 return False
             # get the issue from Youtrack
-            issue = row.connection.get_issue(issue_id)
-            if isinstance(issue, youtrack.Issue):
-                row.issue = issue
-            else:
-                click.echo("    Could not find issue with id of {0}. Please try again.".format(issue_id))
-                continue
+            try:
+                issue = row.connection.get_issue(issue_id)
+                if isinstance(issue, yt.Issue):
+                    row.issue = issue
+                    continue
+            except yt.YouTrackException as e:
+                click.echo(e)
+            click.echo("    Could not find issue with id of {0}. Please try again.".format(issue_id))
+            continue
     # if we ever get to ignore Row
     return False
 
