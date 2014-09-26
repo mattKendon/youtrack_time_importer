@@ -1,6 +1,6 @@
 __author__ = 'Matthew'
 
-import sys, os
+import os
 import click
 from dateutil.parser import parse as date_parse
 import datetime
@@ -160,16 +160,17 @@ def report(ctx, name, from_date_string, to_date_string):
 
 @youtrack.command()
 @click.argument('filename', type=click.File('rU', 'utf-8-sig'))
+@click.option('-t', '--testing', is_flag=True)
 @click.pass_context
-def manictime(ctx, filename):
+def manictime(ctx, filename, testing):
 
     connection = ctx.obj['connection']
 
     try:
         rows = csv.DictReader(filename)
-        print("Importing timeslips")
+        click.echo("Importing timeslips")
     except csv.Error as e:
-        exit("Could not find file")
+        ctx.fail("Could not find file")
 
     count = 0
     total = 0
@@ -180,29 +181,30 @@ def manictime(ctx, filename):
             # save
             if not row.timeslip_exists():
                 count += 1
-                row.save()
-                print("    uploaded timeslip")
+                if not testing:
+                    row.save()
+                click.echo("  Uploaded timeslip for {0}".format(row.timeslip_string()))
             else:
-                print("  Timeslip for " + row.get_issue_id() + " (" +
-                      row.timeslip_string() + ") already exists")
+                click.echo("  Timeslip for {0} ({1}) already exists".format(row.get_issue_id(), row.timeslip_string()))
         else:
             # ignore
-            print("  Timeslip ignored")
-    print("Added " + str(count) + " timeslips out of " + str(total))
+            click.echo("  Timeslip ignored")
+    click.echo("Added {0} timeslips out of {1}.".format(count, total))
 
 
 @youtrack.command()
 @click.argument('filename', type=click.File('rU', 'utf-8-sig'))
+@click.option('-t', '--testing', is_flag=True)
 @click.pass_context
-def toggl(ctx, filename):
+def toggl(ctx, filename, testing):
 
     connection = ctx.obj['connection']
 
     try:
         rows = csv.DictReader(filename)
-        print("Importing timeslips")
+        click.echo("Importing timeslips")
     except csv.Error as e:
-        exit("Could not find file")
+        ctx.fail("Could not find file")
 
     count = 0
     total = 0
@@ -213,14 +215,15 @@ def toggl(ctx, filename):
             # save
             if not row.timeslip_exists():
                 count += 1
-                row.save()
-                print("    uploaded timeslip")
+                if not testing:
+                    row.save()
+                click.echo("  Uploaded timeslip for {0}".format(row.timeslip_string()))
             else:
-                print("  Timeslip for {0} ({1}) already exists".format(row.get_issue_id(), row.timeslip_string()))
+                click.echo("  Timeslip for {0} ({1}) already exists".format(row.get_issue_id(), row.timeslip_string()))
         else:
             # ignore
-            print("  Timeslip ignored")
-    print("Added {0} timeslips out of {1}.".format(count, total))
+            click.echo("  Timeslip ignored")
+    click.echo("Added {0} timeslips out of {1}.".format(count, total))
 
 
 def process_row(row):
