@@ -10,6 +10,7 @@ import youtrack as yt
 from youtrack_time_importer import ManicTimeRow
 from youtrack_time_importer import TogglRow
 import configparser
+from configparser import NoOptionError
 from requests.exceptions import ConnectionError
 
 
@@ -47,10 +48,14 @@ def youtrack(ctx, url, username, password):
     ctx.obj['config'] = cfg
     if not ctx.invoked_subcommand == 'config':
 
-        if not url and cfg.has_option('connection', 'url'):
-            url = cfg.get('connection', 'url')
-        if not username and cfg.has_option('connection', 'url'):
-            username = cfg.get('connection', 'username')
+        try:
+            if not url and cfg.has_option('connection', 'url'):
+                url = cfg.get('connection', 'url')
+            if not username and cfg.has_option('connection', 'url'):
+                username = cfg.get('connection', 'username')
+        except NoOptionError as e:
+            url = None
+            username = None
 
         if not url and not username:
             click.echo("No configuration set for connection to YouTrack. "
@@ -258,14 +263,15 @@ def process_row(row):
             if project_id == "":
                 return False
             # get the project from Youtrack
-            project = row.connection.getProject(project_id)
-            # if we have a project set it and continue
-            if isinstance(project, youtrack.Project):
-                row.project = project
-            # else tell the user and try again
-            else:
-                click.echo("    Could not find project with {0}. Please try again.".format(project_id))
-                continue
+            try:
+                project = row.connection.getProject(project_id)
+                if isinstance(project, yt.Project):
+                    row.project = project
+                    continue
+            except yt.YouTrackException as e:
+                pass
+            click.echo("    Could not find project with {0}. Please try again.".format(project_id))
+            continue
         # if we have a project lets try get an issue
         else:
             message = "  Enter Issue Id for {0} (Leave blank to skip this timeslip)"

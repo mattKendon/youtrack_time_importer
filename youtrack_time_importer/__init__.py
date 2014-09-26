@@ -33,10 +33,13 @@ class Row(object):
     @property
     def project(self):
         if not isinstance(self._project, youtrack.Project):
-            result = self.connection.getProject(self.get_project_id_from_tags())
-            if result:
-                self._project = result
-            else:
+            try:
+                result = self.connection.getProject(str(self.get_project_id_from_tags()))
+                if result:
+                    self._project = result
+                else:
+                    self._project = False
+            except youtrack.YouTrackException as e:
                 self._project = False
         return self._project
 
