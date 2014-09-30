@@ -175,9 +175,11 @@ def manictime(ctx, filename, testing):
 
     try:
         rows = csv.DictReader(filename)
-        click.echo("Importing timeslips")
     except csv.Error as e:
-        ctx.fail("Could not find file")
+        ctx.fail(e)
+    else:
+        click.echo("Importing timeslips")
+
 
     count = 0
     total = 0
@@ -209,9 +211,11 @@ def toggl(ctx, filename, testing):
 
     try:
         rows = csv.DictReader(filename)
-        click.echo("Importing timeslips")
     except csv.Error as e:
-        ctx.fail("Could not find file")
+        ctx.fail(e)
+    else:
+        click.echo("Importing timeslips")
+
 
     count = 0
     total = 0
