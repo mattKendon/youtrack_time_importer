@@ -16,7 +16,8 @@ from requests.exceptions import ConnectionError
 import requests
 
 
-yesterday = date_parse('yesterday').strftime('%Y-%m-%d')
+yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+
 
 def config_path():
     path = click.get_app_dir("YouTrack")
@@ -232,8 +233,13 @@ def toggl(ctx, file, since, until, testing):
         url = "https://toggl.com/reports/api/v2/details"
         params = dict()
         params['user_agent'] = "matt@outlandish.com"
-        params['since'] = "2014-09-30"
-        params['until'] = "2014-09-30"
+
+        try:
+            params['since'] = date_parse(since).strftime("%Y-%m-%d")
+            params['until'] = date_parse(until).strftime("%Y-%m-%d")
+        except Exception as e:
+            ctx.fail(e)
+
         try:
             auth = (cfg.get('toggl', 'token'), 'api_token')
             params['workspace_id'] = cfg.get('toggl', 'workspace')
