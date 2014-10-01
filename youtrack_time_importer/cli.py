@@ -11,6 +11,8 @@ from youtrack_time_importer import ManicTimeRow
 from youtrack_time_importer import TogglRow
 import configparser
 from requests.exceptions import ConnectionError
+from requests.auth import HTTPBasicAuth
+import requests
 
 
 def config_path():
@@ -202,20 +204,37 @@ def manictime(ctx, filename, testing):
 
 
 @youtrack.command()
-@click.argument('filename', type=click.File('rU', 'utf-8-sig'))
+@click.argument('file', type=click.File('rU', 'utf-8-sig'), nargs=1, required=False)
 @click.option('-t', '--testing', is_flag=True)
 @click.pass_context
-def toggl(ctx, filename, testing):
+def toggl(ctx, file, testing):
 
+    cfg = ctx.obj['config']
     connection = ctx.obj['connection']
+    rows = []
 
-    try:
-        rows = csv.DictReader(filename)
-    except csv.Error as e:
-        ctx.fail(e)
+    if file:
+        try:
+            rows = csv.DictReader(file)
+        except csv.Error as e:
+            ctx.fail(e)
+        else:
+            click.echo("Importing timeslips")
     else:
-        click.echo("Importing timeslips")
+        url = "https://toggl.com/reports/api/v2/details",
+        params = {
+            "user_agent": "https://github.com/mattKendon/youtrack_time_importer"
+        }
+        try:
+            token = cfg.get('toggl', 'token')
+            params['workspace_id'] = cfg.get('toggl', 'workspace')
+        except configparser.NoSectionError as e:
+            ctx.fail(e)
+        except configparser.NoOptionError as e:
+            ctx.fail(e)
 
+        result = requests.get(url, auth=HTTPBasicAuth('user', 'pass'), params=params)
+        rows = result.json().get('data', [])
 
     count = 0
     total = 0
