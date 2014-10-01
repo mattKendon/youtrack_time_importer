@@ -33,10 +33,13 @@ class Row(object):
     @property
     def project(self):
         if not isinstance(self._project, youtrack.Project):
-            result = self.connection.getProject(self.get_project_id_from_tags())
-            if result:
-                self._project = result
-            else:
+            try:
+                result = self.connection.getProject(str(self.get_project_id_from_tags()))
+                if result:
+                    self._project = result
+                else:
+                    self._project = False
+            except youtrack.YouTrackException as e:
                 self._project = False
         return self._project
 
@@ -250,7 +253,7 @@ class ManicTimeRow(Row):
         return self.get_field("Notes")
 
 
-class TogglRow(Row):
+class TogglCsvRow(Row):
     datetime_format = "%Y-%m-%d %H:%M:%S"
 
     def get_tags(self):
@@ -269,6 +272,27 @@ class TogglRow(Row):
 
     def get_issue_string(self):
         return self.get_description() + " " + self.get_tags()
+
+
+class TogglApiRow(Row):
+    datetime_format = "%Y-%m-%dT%H:%M:%S"
+
+    def get_description(self):
+        return self.get_field("description")
+
+    def get_issue_string(self):
+        return self.get_description()
+
+    def get_start(self):
+        return self.get_field('start').split("+")[0]
+
+    def get_duration(self):
+        # we only need seconds not milliseconds
+        seconds = round(self.get_field('dur')/1000)
+        return datetime.timedelta(seconds=seconds).__str__()
+
+    def get_tags(self):
+        return ", ".join(self.get_field('tags'))
 
 
 if __name__ == '__main__':

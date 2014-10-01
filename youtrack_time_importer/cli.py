@@ -8,11 +8,15 @@ from youtrack.connection import Connection
 import csv
 import youtrack as yt
 from youtrack_time_importer import ManicTimeRow
-from youtrack_time_importer import TogglRow
+from youtrack_time_importer import TogglCsvRow
+from youtrack_time_importer import TogglApiRow
 import configparser
+from configparser import NoOptionError
 from requests.exceptions import ConnectionError
-from requests.auth import HTTPBasicAuth
 import requests
+
+
+yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
 
 
 def config_path():
@@ -49,10 +53,14 @@ def youtrack(ctx, url, username, password):
     ctx.obj['config'] = cfg
     if not ctx.invoked_subcommand == 'config':
 
-        if not url and cfg.has_option('connection', 'url'):
-            url = cfg.get('connection', 'url')
-        if not username and cfg.has_option('connection', 'url'):
-            username = cfg.get('connection', 'username')
+        try:
+            if not url and cfg.has_option('connection', 'url'):
+                url = cfg.get('connection', 'url')
+            if not username and cfg.has_option('connection', 'url'):
+                username = cfg.get('connection', 'username')
+        except NoOptionError as e:
+            url = None
+            username = None
 
         if not url and not username:
             click.echo("No configuration set for connection to YouTrack. "
@@ -177,11 +185,9 @@ def manictime(ctx, filename, testing):
 
     try:
         rows = csv.DictReader(filename)
-    except csv.Error as e:
-        ctx.fail(e)
-    else:
         click.echo("Importing timeslips")
-
+    except csv.Error as e:
+        ctx.fail("Could not find file")
 
     count = 0
     total = 0
@@ -204,43 +210,58 @@ def manictime(ctx, filename, testing):
 
 
 @youtrack.command()
-@click.argument('file', type=click.File('rU', 'utf-8-sig'), nargs=1, required=False)
+@click.argument('file', type=click.File('rU', 'utf-8-sig'), required=False)
 @click.option('-t', '--testing', is_flag=True)
+@click.option('-s', '--since', type=click.STRING, default=yesterday)
+@click.option('-u', '--until', type=click.STRING, default=yesterday)
 @click.pass_context
-def toggl(ctx, file, testing):
+def toggl(ctx, file, since, until, testing):
 
-    cfg = ctx.obj['config']
     connection = ctx.obj['connection']
-    rows = []
+    cfg = ctx.obj['config']
 
     if file:
+        row_class = TogglCsvRow
         try:
             rows = csv.DictReader(file)
         except csv.Error as e:
-            ctx.fail(e)
+            ctx.fail("Could not find file")
         else:
             click.echo("Importing timeslips")
     else:
-        url = "https://toggl.com/reports/api/v2/details",
-        params = {
-            "user_agent": "https://github.com/mattKendon/youtrack_time_importer"
-        }
+        row_class = TogglApiRow
+        url = "https://toggl.com/reports/api/v2/details"
+        params = dict()
+        params['user_agent'] = "matt@outlandish.com"
+
         try:
-            token = cfg.get('toggl', 'token')
+            params['since'] = date_parse(since).strftime("%Y-%m-%d")
+            params['until'] = date_parse(until).strftime("%Y-%m-%d")
+        except Exception as e:
+            ctx.fail(e)
+
+        try:
+            auth = (cfg.get('toggl', 'token'), 'api_token')
             params['workspace_id'] = cfg.get('toggl', 'workspace')
         except configparser.NoSectionError as e:
             ctx.fail(e)
         except configparser.NoOptionError as e:
             ctx.fail(e)
-
-        result = requests.get(url, auth=HTTPBasicAuth('user', 'pass'), params=params)
-        rows = result.json().get('data', [])
+        else:
+            try:
+                result = requests.get(url, auth=auth, params=params)
+            except requests.ConnectionError as e:
+                ctx.fail(e)
+            except requests.HTTPError as e:
+                ctx.fail(e)
+            else:
+                rows = result.json().get('data', [])
 
     count = 0
     total = 0
     for row in rows:
         total += 1
-        row = TogglRow(connection, row)
+        row = row_class(connection, row)
         if process_row(row):
             # save
             if not row.timeslip_exists():
@@ -281,14 +302,15 @@ def process_row(row):
             if project_id == "":
                 return False
             # get the project from Youtrack
-            project = row.connection.getProject(project_id)
-            # if we have a project set it and continue
-            if isinstance(project, youtrack.Project):
-                row.project = project
-            # else tell the user and try again
-            else:
-                click.echo("    Could not find project with {0}. Please try again.".format(project_id))
-                continue
+            try:
+                project = row.connection.getProject(project_id)
+                if isinstance(project, yt.Project):
+                    row.project = project
+                    continue
+            except yt.YouTrackException as e:
+                pass
+            click.echo("    Could not find project with {0}. Please try again.".format(project_id))
+            continue
         # if we have a project lets try get an issue
         else:
             message = "  Enter Issue Id for {0} (Leave blank to skip this timeslip)"
