@@ -16,6 +16,8 @@ from requests.exceptions import ConnectionError
 import requests
 
 
+yesterday = date_parse('yesterday').strftime('%Y-%m-%d')
+
 def config_path():
     path = click.get_app_dir("YouTrack")
     if not os.path.exists(path):
@@ -209,8 +211,10 @@ def manictime(ctx, filename, testing):
 @youtrack.command()
 @click.argument('file', type=click.File('rU', 'utf-8-sig'), required=False)
 @click.option('-t', '--testing', is_flag=True)
+@click.option('-s', '--since', type=click.STRING, default=yesterday)
+@click.option('-u', '--until', type=click.STRING, default=yesterday)
 @click.pass_context
-def toggl(ctx, file, testing):
+def toggl(ctx, file, since, until, testing):
 
     connection = ctx.obj['connection']
     cfg = ctx.obj['config']
