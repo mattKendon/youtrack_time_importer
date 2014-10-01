@@ -287,7 +287,9 @@ class TogglApiRow(Row):
         return self.get_field('start').split("+")[0]
 
     def get_duration(self):
-        return datetime.timedelta(milliseconds=self.get_field('dur')).__str__()
+        # we only need seconds not milliseconds
+        seconds = round(self.get_field('dur')/1000)
+        return datetime.timedelta(seconds=seconds).__str__()
 
     def get_tags(self):
         return ", ".join(self.get_field('tags'))
