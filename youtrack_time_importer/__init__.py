@@ -295,8 +295,6 @@ class TogglApiRow(Row):
         return ", ".join(self.get_field('tags'))
 
 
-
-
 if __name__ == '__main__':
 
     url = input("Enter in the YouTrack Url (http://tracker.outlandishideas.co.uk): ")
