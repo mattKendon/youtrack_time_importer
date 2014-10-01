@@ -253,7 +253,7 @@ class ManicTimeRow(Row):
         return self.get_field("Notes")
 
 
-class TogglRow(Row):
+class TogglCsvRow(Row):
     datetime_format = "%Y-%m-%d %H:%M:%S"
 
     def get_tags(self):
@@ -272,6 +272,27 @@ class TogglRow(Row):
 
     def get_issue_string(self):
         return self.get_description() + " " + self.get_tags()
+
+
+class TogglApiRow(Row):
+    datetime_format = "%Y-%m-%dT%H:%M:%S"
+
+    def get_description(self):
+        return self.get_field("description")
+
+    def get_issue_string(self):
+        return self.get_description()
+
+    def get_start(self):
+        return self.get_field('start').split("+")[0]
+
+    def get_duration(self):
+        return datetime.timedelta(milliseconds=self.get_field('dur')).__str__()
+
+    def get_tags(self):
+        return ", ".join(self.get_field('tags'))
+
+
 
 
 if __name__ == '__main__':

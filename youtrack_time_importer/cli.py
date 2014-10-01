@@ -8,7 +8,8 @@ from youtrack.connection import Connection
 import csv
 import youtrack as yt
 from youtrack_time_importer import ManicTimeRow
-from youtrack_time_importer import TogglRow
+from youtrack_time_importer import TogglCsvRow
+from youtrack_time_importer import TogglApiRow
 import configparser
 from configparser import NoOptionError
 from requests.exceptions import ConnectionError
@@ -215,6 +216,7 @@ def toggl(ctx, file, testing):
     cfg = ctx.obj['config']
 
     if file:
+        row_class = TogglCsvRow
         try:
             rows = csv.DictReader(file)
         except csv.Error as e:
@@ -222,6 +224,7 @@ def toggl(ctx, file, testing):
         else:
             click.echo("Importing timeslips")
     else:
+        row_class = TogglApiRow
         url = "https://toggl.com/reports/api/v2/details"
         params = dict()
         params['user_agent'] = "matt@outlandish.com"
@@ -248,7 +251,7 @@ def toggl(ctx, file, testing):
     total = 0
     for row in rows:
         total += 1
-        row = TogglRow(connection, row)
+        row = row_class(connection, row)
         if process_row(row):
             # save
             if not row.timeslip_exists():
