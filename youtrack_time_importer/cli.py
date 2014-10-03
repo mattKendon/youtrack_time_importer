@@ -268,6 +268,9 @@ def toggl(ctx, file, since, until, testing):
                 count += 1
                 if not testing:
                     row.save()
+                    if "update_toggl" in dir(row):
+                        row.update_tags("Youtracked")
+                        row.update_toggl(auth)
                 click.echo("  Uploaded timeslip for {0}".format(row.timeslip_string()))
             else:
                 click.echo("  Timeslip for {0} ({1}) already exists".format(row.get_issue_id(), row.timeslip_string()))

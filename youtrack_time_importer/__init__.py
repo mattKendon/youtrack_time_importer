@@ -6,6 +6,7 @@ import csv
 import datetime
 import re
 import youtrack
+import requests
 
 
 class Row(object):
@@ -293,6 +294,24 @@ class TogglApiRow(Row):
 
     def get_tags(self):
         return ", ".join(self.get_field('tags'))
+
+    def update_toggl(self, auth):
+        toggl_id = self.get_toggl_id()
+        toggl_url = "https://www.toggl.com/api/v8/time_entries/{0}".format(toggl_id)
+        try:
+            requests.put(toggl_url, auth=auth, data=self.data)
+        except requests.RequestException as ex:
+            print(ex)
+
+    def get_toggl_id(self):
+        return self.get_field('id')
+
+    def get_toggl_wid(self):
+        return self.get_field('wid')
+
+    def update_tags(self, tag):
+        self.data.get('tags', set()).get(tag, set())
+
 
 
 if __name__ == '__main__':
