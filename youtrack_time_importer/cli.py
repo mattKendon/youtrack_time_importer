@@ -14,15 +14,28 @@ import configparser
 from configparser import NoOptionError
 from requests.exceptions import ConnectionError
 import requests
+from collections import namedtuple
 
 
 today = datetime.date.today()
 if today.weekday() == 0:
     # if monday get friday
     days = 3
+    monday = today
 else:
     days = 1
+    monday = today - datetime.timedelta(days=today.weekday())
+
 yesterday = (today - datetime.timedelta(days=days)).strftime('%Y-%m-%d')
+
+DateRange = namedtuple('DateRange', ['since', 'until'])
+
+RANGES = {
+    "today": DateRange(today, today),
+    "yesterday": DateRange(yesterday, yesterday),
+    "last week": DateRange(monday - datetime.timedelta(days=7), monday - datetime.timedelta(days=3)),
+    "this week": DateRange(monday, today)
+}
 
 
 def config_path():
@@ -220,8 +233,9 @@ def manictime(ctx, filename, testing):
 @click.option('-t', '--testing', is_flag=True)
 @click.option('-s', '--since', type=click.STRING, default=yesterday)
 @click.option('-u', '--until', type=click.STRING, default=yesterday)
+@click.option('-r', '--range', type=click.Choice(RANGES.keys()))
 @click.pass_context
-def toggl(ctx, file, since, until, testing):
+def toggl(ctx, file, since, until, range, testing):
 
     connection = ctx.obj['connection']
     cfg = ctx.obj['config']
@@ -240,11 +254,16 @@ def toggl(ctx, file, since, until, testing):
         params = dict()
         params['user_agent'] = "matt@outlandish.com"
 
-        try:
-            params['since'] = date_parse(since).strftime("%Y-%m-%d")
-            params['until'] = date_parse(until).strftime("%Y-%m-%d")
-        except Exception as e:
-            ctx.fail(e)
+        if range:
+            date_range = RANGES.get(range)
+            params['since'] = date_range.since.strftime("%Y-%m-%d")
+            params['until'] = date_range.until.strftime("%Y-%m-%d")
+        if 'since' not in params and 'until' not in params:
+            try:
+                params['since'] = date_parse(since).strftime("%Y-%m-%d")
+                params['until'] = date_parse(until).strftime("%Y-%m-%d")
+            except Exception as e:
+                ctx.fail(e)
 
         try:
             auth = (cfg.get('toggl', 'token'), 'api_token')
