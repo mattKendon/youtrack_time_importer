@@ -16,7 +16,13 @@ from requests.exceptions import ConnectionError
 import requests
 
 
-yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+today = datetime.date.today()
+if today.weekday() == 0:
+    # if monday get friday
+    days = 3
+else:
+    days = 1
+yesterday = (today - datetime.timedelta(days=days)).strftime('%Y-%m-%d')
 
 
 def config_path():
