@@ -310,7 +310,9 @@ class TogglApiRow(Row):
         return self.get_field('wid')
 
     def update_tags(self, tag):
-        self.data.get('tags', set()).get(tag, set())
+        tags = set(self.data.get('tags'))
+        tags.add(tag)
+        self.data.update(tags=tags)
 
 
 
