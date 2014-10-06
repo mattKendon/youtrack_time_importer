@@ -14,6 +14,7 @@ import configparser
 from configparser import NoOptionError
 from requests.exceptions import ConnectionError
 import requests
+import json
 
 
 yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
@@ -257,27 +258,65 @@ def toggl(ctx, file, since, until, testing):
             else:
                 rows = result.json().get('data', [])
 
-    count = 0
     total = 0
-    for row in rows:
-        total += 1
-        row = row_class(connection, row)
-        if process_row(row):
-            # save
-            if not row.timeslip_exists():
-                count += 1
-                if not testing:
-                    row.save()
-                    if "update_toggl" in dir(row):
-                        row.update_tags("Youtracked")
-                        row.update_toggl(auth)
-                click.echo("  Uploaded timeslip for {0}".format(row.timeslip_string()))
+    ignored = 0
+    timeslips = []
+    try:
+        rows
+    except NameError:
+        ctx.fail("Could not find any data to parse")
+    else:
+        total = len(rows)
+        for row in rows:
+            row = row_class(connection, row)
+            if process_row(row):
+                # save
+                if not row.timeslip_exists():
+                    timeslips.append(row)
+                else:
+                    ignored += 1
+                    click.echo("  Timeslip for {0} ({1}) already exists".format(row.get_issue_id(), row.timeslip_string()))
             else:
-                click.echo("  Timeslip for {0} ({1}) already exists".format(row.get_issue_id(), row.timeslip_string()))
-        else:
-            # ignore
-            click.echo("  Timeslip ignored")
-    click.echo("Added {0} timeslips out of {1}.".format(count, total))
+                # ignore
+                click.echo("  Timeslip ignored")
+                ignored += 1
+
+    count = 0
+    failed = 0
+    toggl_ids = list()
+    if not testing:
+        for timeslip in timeslips:
+            try:
+                timeslip.save()
+            except yt.YouTrackException as e:
+                click.echo("Could not upload timeslip for {0}".format(timeslip.get_issue_id()))
+                click.echo(e)
+                failed += 1
+            else:
+                count += 1
+                if 'id' in timeslip.data:
+                    toggl_ids.append(timeslip.get_toggl_id())
+                click.echo("  Uploaded timeslip for {0}".format(timeslip.timeslip_string()))
+    else:
+        for timeslip in timeslips:
+            click.echo("  Uploaded timeslip for {0}".format(timeslip.timeslip_string()))
+
+    try:
+        auth
+    except NameError:
+        pass
+    else:
+        time_entry = json.dumps({"time_entry": {
+            "tags": ["Youtracked"],
+            "tag_action": "add"
+        }})
+        update_url = "https://www.toggl.com/api/v8/time_entries/{0}".format(",".join(str(x) for x in toggl_ids))
+        requests.put(update_url, auth=auth, data=time_entry)
+
+    click.echo("{total} timeslips were processed".format(total=total))
+    click.echo("{count} timeslips were successfully uploaded".format(count=count))
+    click.echo("{ignored} timeslips were ignored".format(ignored=ignored))
+    click.echo("{failed} timeslips failed and could not be uploaded".format(failed=failed))
 
 
 def process_row(row):
