@@ -1,6 +1,7 @@
 from youtrack import WorkItem
 import abc
 import datetime
+import re
 
 
 class Row(metaclass=abc.ABCMeta):
@@ -11,6 +12,8 @@ class Row(metaclass=abc.ABCMeta):
     project = None
 
     connection = None
+
+    issue_finder = re.compile('(?P<issue_id>[a-zA-Z0-9]*\-[0-9]+)', flags=re.IGNORECASE)
 
     data = dict()
 
@@ -46,6 +49,21 @@ class Row(metaclass=abc.ABCMeta):
         Returns:
             A boolean, which is True if this row is to be ignored
             and False if the row is not to be ignored.
+        """
+
+    @abc.abstractmethod
+    def find_issue_id(self):
+        """Return the issue ID from the row's data
+
+        This will find the issue ID in the rows data using regular
+        expressions to do so.
+
+        Returns:
+            A string in the form ABC-123, where ABC is the project ID
+            in youtrack and 123 is the issue's number in that project.
+
+        Raises:
+            RowHasNoIssueIdException
         """
 
     @abc.abstractmethod
@@ -86,6 +104,14 @@ class TogglAPIRow(Row):
 
     def is_ignored(self):
         return "ignore" in self.data.get("tags")
+
+    def find_issue_id(self):
+        match = self.issue_finder.search(self.data.get("description"))#
+        if match is None:
+            # raise error
+            pass
+        else:
+            return match.group('issue_id')
 
     def start_datetime(self):
         """Return a datetime object representation of the start date and time"""
