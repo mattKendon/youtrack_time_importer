@@ -1,5 +1,6 @@
 from unittest import TestCase
 from youtrack_time_importer.row import TogglAPIRow
+from youtrack_time_importer.row import YoutrackMissingConnectionException
 from youtrack import WorkItem
 __author__ = 'Matthew'
 
@@ -26,7 +27,7 @@ class TestTogglAPIRow(TestCase):
             'id': 166078570,
             'uid': 907967
         }
-        self.row = TogglAPIRow(self.data)
+        self.row = TogglAPIRow(self.data, "connection")
 
     def test_work_item(self):
         work_item = self.row.work_item()
@@ -58,3 +59,10 @@ class TestTogglAPIRow(TestCase):
     def test_find_project_id_returns_false_if_no_issue_id(self):
         self.row.data['description'] = "Support new presences in code"
         self.assertFalse(self.row.find_project_id())
+
+    def test_save_work_item_raises_exception_if_no_connection(self):
+        work_item = WorkItem()
+        work_item.description = "Test Description"
+        work_item.duration = "10"
+        work_item.date = "1000"
+        self.assertRaises(YoutrackMissingConnectionException, self.row.save_work_item, work_item=work_item)

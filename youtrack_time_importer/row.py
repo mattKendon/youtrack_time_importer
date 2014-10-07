@@ -1,4 +1,6 @@
 from youtrack import WorkItem
+from youtrack import YouTrackException
+from youtrack.connection import Connection
 import abc
 import datetime
 import re
@@ -80,8 +82,38 @@ class Row(metaclass=abc.ABCMeta):
     def __str__(self):
         pass
 
-    def __init__(self, data):
+    def __init__(self, data, connection):
         self.data = data
+        self.connection = connection
+
+    def save_work_item(self, work_item):
+        """Saves WorkItem to Youtrack
+
+        Uses the Youtrack Connection to save the WorkItem
+        to the issue, if it is determined that the issue ID
+        is correct.
+
+        Args:
+            work_item: A WorkItem object with description, duration
+            and date all set
+
+        Raises:
+            Raises a YoutrackException for general connection issues,
+            a YoutrackIssueNotPresentException if no issue ID was found,
+            a YoutrackIssueIncorrect if the issue ID was not found on the
+            Youtrack server
+        """
+
+        issue_id = self.find_issue_id()
+        if not issue_id:
+            raise YoutrackIssueNotFoundException()
+        try:
+            self.connection.createWorkItem(issue_id, work_item)
+        except AttributeError as ae:
+            if "createWorkItem" in ae:
+                raise YoutrackMissingConnectionException()
+            else:
+                raise YoutrackIssueIncorrectException()
 
 
 class TogglCSVRow(Row):
@@ -137,4 +169,14 @@ class TogglAPIRow(Row):
         return datetime.datetime.strptime(start, self.datetime_format)
 
 
+class YoutrackIssueNotFoundException(Exception):
+    pass
+
+
+class YoutrackIssueIncorrectException(Exception):
+    pass
+
+
+class YoutrackMissingConnectionException(Exception):
+    pass
 
