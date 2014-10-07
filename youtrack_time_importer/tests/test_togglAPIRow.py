@@ -47,3 +47,14 @@ class TestTogglAPIRow(TestCase):
 
     def test_find_issue_id(self):
         self.assertEqual('BCSM-15', self.row.find_issue_id())
+
+    def test_find_issue_id_return_false_if_no_issue_id(self):
+        self.row.data['description'] = "Support new presences in code"
+        self.assertFalse(self.row.find_issue_id())
+
+    def test_find_project_id(self):
+        self.assertEqual("BCSM", self.row.find_project_id())
+
+    def test_find_project_id_returns_false_if_no_issue_id(self):
+        self.row.data['description'] = "Support new presences in code"
+        self.assertFalse(self.row.find_project_id())

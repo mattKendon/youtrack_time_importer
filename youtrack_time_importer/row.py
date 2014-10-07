@@ -61,9 +61,19 @@ class Row(metaclass=abc.ABCMeta):
         Returns:
             A string in the form ABC-123, where ABC is the project ID
             in youtrack and 123 is the issue's number in that project.
+        """
 
-        Raises:
-            RowHasNoIssueIdException
+    @abc.abstractmethod
+    def find_project_id(self):
+        """Return the project ID from the row's data
+
+        This will find the project ID in the rows data using regular
+        expressions to find the issue ID, and then return the first part
+        of that string.
+
+        Returns:
+            A string in the form ABC, where ABC is the project ID
+            in youtrack.
         """
 
     @abc.abstractmethod
@@ -109,9 +119,16 @@ class TogglAPIRow(Row):
         match = self.issue_finder.search(self.data.get("description"))#
         if match is None:
             # raise error
-            pass
+            return False
         else:
             return match.group('issue_id')
+
+    def find_project_id(self):
+        issue_id = self.find_issue_id()
+        if not issue_id:
+            return False
+        else:
+            return issue_id.split("-")[0]
 
     def start_datetime(self):
         """Return a datetime object representation of the start date and time"""
