@@ -44,3 +44,6 @@ class TestTogglAPIRow(TestCase):
     def test_is_ignored_when_ignore_tag_is_present(self):
         self.row.data.get("tags").append("ignore")
         self.assertTrue(self.row.is_ignored())
+
+    def test_find_issue_id(self):
+        self.assertEqual('BCSM-15', self.row.find_issue_id())
