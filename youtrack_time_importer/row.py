@@ -9,22 +9,14 @@ import re
 class Row(metaclass=abc.ABCMeta):
     """abstract class to handle a row of data from a CSV or API call"""
 
-    issue = None
-
-    project = None
-
-    connection = None
-
     issue_finder = re.compile('(?P<issue_id>[a-zA-Z0-9]*\-[0-9]+)', flags=re.IGNORECASE)
-
-    data = dict()
 
     @abc.abstractproperty
     def datetime_format(self):
         pass
 
     @abc.abstractmethod
-    def work_item(self):
+    def create_work_item(self):
         """Return WorkItem object with correctly formatted properties
 
         Creates a WorkItem object and then adds the three required properties
@@ -66,27 +58,36 @@ class Row(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def find_project_id(self):
-        """Return the project ID from the row's data
-
-        This will find the project ID in the rows data using regular
-        expressions to find the issue ID, and then return the first part
-        of that string.
-
-        Returns:
-            A string in the form ABC, where ABC is the project ID
-            in youtrack.
-        """
-
-    @abc.abstractmethod
     def __str__(self):
         pass
 
     def __init__(self, data, connection):
         self.data = data
         self.connection = connection
+        self._issue_id = None
+        self._work_item = None
 
-    def save_work_item(self, work_item):
+    @property
+    def issue_id(self):
+        if not self._issue_id:
+            self._issue_id = self.find_issue_id()
+        return self._issue_id
+
+    @issue_id.setter
+    def issue_id(self, value):
+        self._issue_id = value
+
+    @property
+    def work_item(self):
+        if not self._work_item:
+            self._work_item = self.create_work_item()
+        return self._work_item
+
+    @work_item.setter
+    def work_item(self, value):
+        self._work_item = value
+
+    def save_work_item(self):
         """Saves WorkItem to Youtrack
 
         Uses the Youtrack Connection to save the WorkItem
@@ -99,21 +100,22 @@ class Row(metaclass=abc.ABCMeta):
 
         Raises:
             Raises a YoutrackException for general connection issues,
-            a YoutrackIssueNotPresentException if no issue ID was found,
+            a YoutrackMissingConnectionException if the connection object
+            doesnt' have the method createWorkItem()
+            a YoutrackIssueNotFoundException if issue doesnt exist on server,
             a YoutrackIssueIncorrect if the issue ID was not found on the
             Youtrack server
         """
 
-        issue_id = self.find_issue_id()
-        if not issue_id:
-            raise YoutrackIssueNotFoundException()
         try:
-            self.connection.createWorkItem(issue_id, work_item)
+            self.connection.createWorkItem(self.issue_id, str(self.work_item))
         except AttributeError as ae:
-            if "createWorkItem" in ae:
+            if "createWorkItem" in ae.args[0]:
                 raise YoutrackMissingConnectionException()
             else:
-                raise YoutrackIssueIncorrectException()
+                raise YoutrackWorkItemIncorrectException()
+        except YouTrackException as e:
+            raise YoutrackIssueNotFoundException
 
 
 class TogglCSVRow(Row):
@@ -126,7 +128,7 @@ class TogglCSVRow(Row):
 class TogglAPIRow(Row):
     datetime_format = "%Y-%m-%dT%H:%M:%S"
 
-    def work_item(self):
+    def create_work_item(self):
         work_item = WorkItem()
 
         description = self.data.get("description")
@@ -136,6 +138,7 @@ class TogglAPIRow(Row):
         work_item.description = description
         work_item.duration = str(duration)
         work_item.date = str(date)
+
         return work_item
 
     def __str__(self):
@@ -148,19 +151,11 @@ class TogglAPIRow(Row):
         return "ignore" in self.data.get("tags")
 
     def find_issue_id(self):
-        match = self.issue_finder.search(self.data.get("description"))#
-        if match is None:
-            # raise error
-            return False
-        else:
+        match = self.issue_finder.search(self.data.get("description"))
+        try:
             return match.group('issue_id')
-
-    def find_project_id(self):
-        issue_id = self.find_issue_id()
-        if not issue_id:
+        except AttributeError as e:
             return False
-        else:
-            return issue_id.split("-")[0]
 
     def start_datetime(self):
         """Return a datetime object representation of the start date and time"""
@@ -173,7 +168,7 @@ class YoutrackIssueNotFoundException(Exception):
     pass
 
 
-class YoutrackIssueIncorrectException(Exception):
+class YoutrackWorkItemIncorrectException(Exception):
     pass
 
 
