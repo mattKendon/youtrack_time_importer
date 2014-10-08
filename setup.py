@@ -8,7 +8,8 @@ setup(
     install_requires=[
         'Click',
         'requests',
-        'python-dateutil'
+        'python-dateutil',
+        'parsedatetime'
     ],
     entry_points='''
         [console_scripts]
