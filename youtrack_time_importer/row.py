@@ -147,8 +147,44 @@ class Row(metaclass=abc.ABCMeta):
 class TogglCSVRow(Row):
     datetime_format = "%Y-%m-%d %H:%M:%S"
 
-    def description(self):
-        return self.data.get("description")
+    def create_work_item(self):
+        work_item = WorkItem()
+
+        description = self.data.get('Description')
+        duration = self.duration_as_minutes()
+        date = round(self.start_datetime().timestamp()*1000)
+
+        work_item.description = description
+        work_item.duration = str(duration)
+        work_item.date = str(date)
+
+        return work_item
+
+    def duration_as_minutes(self):
+        duration = self.data.get('Duration').split(":")
+        return int(duration[0])*60 + int(duration[1]) + round(float(duration[2])/60)
+
+    def start_datetime(self):
+        """Return a datetime object representation of the start date and time"""
+
+        start = "{0} {1}".format(self.data.get('Start date'), self.data.get('Start time'))
+        return datetime.datetime.strptime(start, self.datetime_format)
+
+    def __str__(self):
+        description = self.data.get("Description")
+        time = self.start_datetime().strftime("%H:%M")
+        date = self.start_datetime().strftime("%d/%m/%y")
+        return "{d} - {t} {dt}".format(d=description, t=time, dt=date)
+
+    def is_ignored(self):
+        return "ignore" in self.data.get("Tags")
+
+    def find_issue_id(self):
+        match = self.issue_finder.search(self.data.get("Description"))
+        try:
+            return match.group('issue_id')
+        except AttributeError as e:
+            return False
 
 
 class TogglAPIRow(Row):
