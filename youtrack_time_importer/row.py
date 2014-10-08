@@ -87,6 +87,33 @@ class Row(metaclass=abc.ABCMeta):
     def work_item(self, value):
         self._work_item = value
 
+    def work_item_exists(self):
+        """Checks to see if WorkItem already exists
+
+        Gets all the WorkItems for an issue and checks to see if
+        once exists with the same date and duration. As date is a timestamp
+        based on date and time, this should be completely unique.
+
+        Returns:
+            Boolean value, returning True if it exists, and false if :
+            it doesn't
+
+        Raises:
+            A YoutrackIssueNotFoundException if issue doesnt exist on server
+        """
+
+        try:
+            work_items = self.connection.getWorkItems(self.issue_id)
+        except YouTrackException as e:
+            return False
+        else:
+            for work_item in work_items:
+                if (work_item.authorLogin == self.connection.login and
+                        work_item.date == self.work_item.date and
+                        work_item.duration == self.work_item.duration):
+                    return True
+            return False
+
     def save_work_item(self):
         """Saves WorkItem to Youtrack
 
@@ -99,16 +126,15 @@ class Row(metaclass=abc.ABCMeta):
             and date all set
 
         Raises:
-            Raises a YoutrackException for general connection issues,
-            a YoutrackMissingConnectionException if the connection object
+            A YoutrackMissingConnectionException if the connection object
             doesnt' have the method createWorkItem()
             a YoutrackIssueNotFoundException if issue doesnt exist on server,
-            a YoutrackIssueIncorrect if the issue ID was not found on the
-            Youtrack server
+            a YoutrackWorkItemIncorrectException if the work_item does not have
+            all attributes
         """
 
         try:
-            self.connection.createWorkItem(self.issue_id, str(self.work_item))
+            self.connection.createWorkItem(self.issue_id, self.work_item)
         except AttributeError as ae:
             if "createWorkItem" in ae.args[0]:
                 raise YoutrackMissingConnectionException()
