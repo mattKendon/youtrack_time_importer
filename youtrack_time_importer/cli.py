@@ -3,10 +3,10 @@ __author__ = 'Matthew'
 from configparser import NoOptionError
 from dateutil.parser import parse as date_parse
 from parsedatetime import Calendar
-from requests.exceptions import ConnectionError
 from youtrack.connection import Connection
 from youtrack_time_importer.row import TogglCSVRow
 from youtrack_time_importer.row import TogglAPIRow
+from youtrack_time_importer.row import ManictimeRow
 from youtrack_time_importer.row import YoutrackIssueNotFoundException
 from youtrack_time_importer.row import YoutrackMissingConnectionException
 from youtrack_time_importer.row import YoutrackWorkItemIncorrectException
@@ -14,7 +14,6 @@ import click
 import configparser
 import csv
 import datetime
-import json
 import os
 import requests
 import youtrack as yt
@@ -46,11 +45,12 @@ def read_config():
 @click.option('-p', '--password')
 @click.pass_context
 def youtrack(ctx, url, username, password):
-    """ adds config file to Context and starts connection
+    """ adds config file and Connection creating object to ctx
 
-    This will only start the connection if the subcommand is not config
-    :param ctx:
-    :return:
+    This will prepare the context for other commands. It reads the config file
+    and adds the file to the Context. It also instantiates the CreateConnection class
+    which allows for lazy loading of the Youtrack connection so that we only try to
+    connect if we are required to.
     """
 
     class CreateConnection(object):
@@ -123,30 +123,31 @@ def add(ctx, option, value):
 @click.argument('to_date_string', nargs=1)
 @click.pass_context
 def report(ctx, name, from_date_string, to_date_string):
-    pass
+    click.echo("Coming Soon!")
+    exit()
 
 
 @youtrack.command()
-@click.argument('filename', type=click.File('rU', 'utf-8-sig'))
-@click.option('-t', '--testing', is_flag=True)
+@click.argument('file', type=click.File('rU', 'utf-8-sig'))
 @click.pass_context
-def manictime(ctx, filename, testing):
-    pass
+def manictime(ctx, file):
+
+    row_class = ManictimeRow
+    try:
+        rows = csv.DictReader(file)
+    except csv.Error as e:
+        ctx.fail("Could not find file")
+    else:
+        process_rows(rows, row_class, ctx)
 
 
 
 @youtrack.command()
 @click.argument('file', type=click.File('rU', 'utf-8-sig'), required=False)
-@click.option('-t', '--testing', is_flag=True)
 @click.option('-s', '--since', type=click.STRING, default=yesterday)
 @click.option('-u', '--until', type=click.STRING, default=yesterday)
 @click.pass_context
-def toggl(ctx, file, since, until, testing):
-
-    try:
-        connection = ctx.obj['create_connection'].create()
-    except yt.YouTrackException as e:
-        ctx.fail(e)
+def toggl(ctx, file, since, until):
 
     rows = list()
 
@@ -190,37 +191,7 @@ def toggl(ctx, file, since, until, testing):
             else:
                 rows = result.json()['data']
 
-    for row in rows:
-        row = row_class(row, connection)
-        if row.is_ignored():
-            click.echo("\nIgnored: Time Entry for {0}".format(row.__str__()))
-            continue
-        while True:
-            if row.work_item_exists():
-                click.echo("\nDuplicate: Time Entry for {0}".format(row.__str__()))
-                break
-            try:
-                row.save_work_item()
-            except YoutrackIssueNotFoundException as e:
-                click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
-                click.echo("  Error: No Issue found or Issue Id incorrect\n")
-                issue_id = click.prompt("  Please provide the correct Issue Id [leave blank to ignore]:")
-                if not issue_id:
-                    click.echo("\nIgnored: Time Entry for {0}".format(row.__str__()))
-                    break
-                row.issue_id = issue_id
-            except YoutrackMissingConnectionException as e:
-                click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
-                ctx.fail("  Error: YouTrack connection is missing method to create Time Entry")
-            except yt.YouTrackException as e:
-                click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
-                ctx.fail("  Error: Unable to connect to YouTrack")
-            except YoutrackWorkItemIncorrectException as e:
-                click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
-                ctx.fail("  Error: Unable to create Time Entry. Missing important properties")
-            else:
-                click.echo("\nCreated: Time Entry for {0}".format(row.__str__()))
-                break
+    process_rows(rows, row_class, ctx)
 
 
 def process_datetime(date_string):
@@ -232,62 +203,44 @@ def process_datetime(date_string):
     return dt
 
 
+def process_rows(rows, row_class, ctx):
 
-
-def process_row(row):
-    # if ignore exists in tags, return False
-    if row.is_ignored():
-        return False
-    # if issue exists and we haven't ignored it
-    if row.issue_exists():
-        return True
-    # if issue does not exist lets prompt the user
-    response = click.confirm("  No Issue found for \"{0}\". Add to an issue?".format(row.get_issue_string()))
-    # if they respond "n" return False
-    if not response:
-        return False
-    # if they want to go ahead start loop
-    while True:
-        # check to see if issue exists
-        if row.issue_exists():
-            return True
-        # lets get a project from them
-        if not row.project_exists():
-            message = "  Enter Project Id for {0} (Leave blank to skip this timeslip)"
-            project_id = click.prompt(message.format(row.timeslip_string()))
-            # if left blank, ignore row
-            if project_id == "":
-                return False
-            # get the project from Youtrack
-            try:
-                project = row.connection.getProject(project_id)
-                if isinstance(project, yt.Project):
-                    row.project = project
-                    continue
-            except yt.YouTrackException as e:
-                pass
-            click.echo("    Could not find project with {0}. Please try again.".format(project_id))
-            continue
-        # if we have a project lets try get an issue
-        else:
-            message = "  Enter Issue Id for {0} (Leave blank to skip this timeslip)"
-            issue_id = click.prompt(message.format(row.timeslip_string()))
-            # if left blank ignore row
-            if issue_id == "":
-                return False
-            # get the issue from Youtrack
-            try:
-                issue = row.connection.get_issue(issue_id)
-                if isinstance(issue, yt.Issue):
-                    row.issue = issue
-                    continue
-            except yt.YouTrackException as e:
-                click.echo(e)
-            click.echo("    Could not find issue with id of {0}. Please try again.".format(issue_id))
-            continue
-    # if we ever get to ignore Row
-    return False
-
+    try:
+        connection = ctx.obj['create_connection'].create()
+    except yt.YouTrackException as e:
+        ctx.fail(e)
+    else:
+        for row in rows:
+            row = row_class(row, connection)
+            if row.is_ignored():
+                click.echo("\nIgnored: Time Entry for {0}".format(row.__str__()))
+                continue
+            while True:
+                if row.work_item_exists():
+                    click.echo("\nDuplicate: Time Entry for {0}".format(row.__str__()))
+                    break
+                try:
+                    row.save_work_item()
+                except YoutrackIssueNotFoundException as e:
+                    click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                    click.echo("  Error: No Issue found or Issue Id incorrect\n")
+                    issue_id = click.prompt("  Please provide the correct Issue Id [leave blank to ignore]:")
+                    if not issue_id:
+                        click.echo("\nIgnored: Time Entry for {0}".format(row.__str__()))
+                        break
+                    row.issue_id = issue_id
+                except YoutrackMissingConnectionException as e:
+                    click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                    ctx.fail("  Error: YouTrack connection is missing method to create Time Entry")
+                except yt.YouTrackException as e:
+                    click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                    ctx.fail("  Error: Unable to connect to YouTrack")
+                except YoutrackWorkItemIncorrectException as e:
+                    click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                    ctx.fail("  Error: Unable to create Time Entry. Missing important properties")
+                else:
+                    click.echo("\nCreated: Time Entry for {0}".format(row.__str__()))
+                    break
 
 if __name__ == "__main__":
     youtrack()
