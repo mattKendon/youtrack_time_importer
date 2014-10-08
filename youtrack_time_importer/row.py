@@ -1,6 +1,5 @@
 from youtrack import WorkItem
 from youtrack import YouTrackException
-from youtrack.connection import Connection
 import abc
 import datetime
 import re
@@ -142,6 +141,49 @@ class Row(metaclass=abc.ABCMeta):
                 raise YoutrackWorkItemIncorrectException()
         except YouTrackException as e:
             raise YoutrackIssueNotFoundException
+
+
+class ManictimeRow(Row):
+    datetime_format = "%d/%m/%Y %H:%M:%S"
+
+    def create_work_item(self):
+        work_item = WorkItem()
+
+        description = self.data.get('Notes')
+        duration = self.duration_as_minutes()
+        date = round(self.start_datetime().timestamp()*1000)
+
+        work_item.description = description
+        work_item.duration = str(duration)
+        work_item.date = str(date)
+
+        return work_item
+
+    def duration_as_minutes(self):
+        duration = self.data.get('Duration').split(":")
+        return int(duration[0])*60 + int(duration[1]) + round(float(duration[2])/60)
+
+    def start_datetime(self):
+        """Return a datetime object representation of the start date and time"""
+
+        return datetime.datetime.strptime(self.data.get('Start'), self.datetime_format)
+
+    def __str__(self):
+        tags = self.data.get("Name")
+        description = self.data.get("Notes")
+        time = self.start_datetime().strftime("%H:%M")
+        date = self.start_datetime().strftime("%d/%m/%y")
+        return "{tags} / {d} - {t} {dt}".format(tags=tags, d=description, t=time, dt=date)
+
+    def is_ignored(self):
+        return "ignore" in self.data.get("Name")
+
+    def find_issue_id(self):
+        match = self.issue_finder.search(self.data.get("Name"))
+        try:
+            return match.group('issue_id')
+        except AttributeError as e:
+            return False
 
 
 class TogglCSVRow(Row):
