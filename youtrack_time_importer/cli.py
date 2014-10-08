@@ -1,20 +1,23 @@
 __author__ = 'Matthew'
 
-import os
-import click
-from dateutil.parser import parse as date_parse
-import datetime
-from youtrack.connection import Connection
-import csv
-import youtrack as yt
-from youtrack_time_importer import ManicTimeRow
-from youtrack_time_importer import TogglCsvRow
-from youtrack_time_importer import TogglApiRow
-import configparser
 from configparser import NoOptionError
+from dateutil.parser import parse as date_parse
+from parsedatetime import Calendar
 from requests.exceptions import ConnectionError
-import requests
+from youtrack.connection import Connection
+from youtrack_time_importer.row import TogglCSVRow
+from youtrack_time_importer.row import TogglAPIRow
+from youtrack_time_importer.row import YoutrackIssueNotFoundException
+from youtrack_time_importer.row import YoutrackMissingConnectionException
+from youtrack_time_importer.row import YoutrackWorkItemIncorrectException
+import click
+import configparser
+import csv
+import datetime
 import json
+import os
+import requests
+import youtrack as yt
 
 
 yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
@@ -49,37 +52,35 @@ def youtrack(ctx, url, username, password):
     :param ctx:
     :return:
     """
+
+    class CreateConnection(object):
+        def __init__(self, url, username, password, cfg):
+            if not url:
+                url = cfg.get('connection', 'url')
+            if not username:
+                username = cfg.get('connection', 'username')
+            self.url = url
+            self.username = username
+            self.password = password
+
+        def create(self):
+            if not self.password:
+                message = "Please enter the password for the YouTrack user {0}".format(self.username)
+                self.password = click.prompt(message, hide_input=True)
+            return Connection(self.url, self.username, self.password)
+
+
     ctx.obj = dict()
     cfg = read_config()
-    ctx.obj['config'] = cfg
-    if not ctx.invoked_subcommand == 'config':
+    ctx.obj['cfg'] = cfg
 
-        try:
-            if not url and cfg.has_option('connection', 'url'):
-                url = cfg.get('connection', 'url')
-            if not username and cfg.has_option('connection', 'url'):
-                username = cfg.get('connection', 'username')
-        except NoOptionError as e:
-            url = None
-            username = None
-
-        if not url and not username:
-            click.echo("No configuration set for connection to YouTrack. "
-                       "Please add your url and username to the config by using the following commands:")
-            click.echo()
-            click.echo("youtrack config add connection.username <username>")
-            click.echo("youtrack config add connection.url <url>")
-            click.echo()
-            ctx.exit(-1)
-        if not password:
-            password = click.prompt("Please enter the password for the YouTrack user {0}".format(username), hide_input=True)
-        try:
-            connection = Connection(url, username, password)
-            ctx.obj['connection'] = connection
-        except yt.YouTrackException as e:
-            ctx.fail(e)
-        except ConnectionError as e:
-            ctx.fail(e)
+    try:
+        ctx.obj['create_connection'] = CreateConnection(url, username, password, cfg)
+    except NoOptionError as e:
+        ctx.fail("No configuration set for connection to YouTrack. "
+                   "Please add your url and username to the config by using the following commands:\n\n"
+                   "youtrack config add connection.username <username>\n"
+                   "youtrack config add connection.url <url>\n")
 
 
 @youtrack.group(invoke_without_command=True)
@@ -87,7 +88,7 @@ def youtrack(ctx, url, username, password):
 def config(ctx):
     """view command for config if no subcommand called"""
     if not ctx.invoked_subcommand:
-        cfg = ctx.obj['config']
+        cfg = ctx.obj['cfg']
         for section in cfg.sections():
             print("[", section, "]")
             for option in cfg[section]:
@@ -108,7 +109,7 @@ def add(ctx, option, value):
     properties = option.split(".")
     section = properties[0]
     option = properties[1]
-    cfg = ctx.obj['config']
+    cfg = ctx.obj['cfg']
     if not cfg.has_section(section):
         cfg.add_section(section)
     cfg.set(section, option, value)
@@ -122,58 +123,7 @@ def add(ctx, option, value):
 @click.argument('to_date_string', nargs=1)
 @click.pass_context
 def report(ctx, name, from_date_string, to_date_string):
-
-    try:
-        from_date_string = date_parse(from_date_string).strftime("%Y-%m-%d")
-        to_date_string = date_parse(to_date_string).strftime("%Y-%m-%d")
-    except:
-        ctx.fail("Could not convert one or more date strings. "
-                 "Please use a recognised format such as YYYY-MM-DD")
-
-    #get connection to youtrack
-    connection = ctx.obj['connection']
-
-    #filter string
-    filter_string = ""
-
-    #get project ids and loop through them
-    project_ids = connection.getProjectIds()
-    report_items = []
-    click.echo("Searching {0} projects for tasks that you've worked on".format(len(project_ids)))
-    with click.progressbar(project_ids) as bar:
-        for project_id in bar:
-            try:
-                issues = connection.getIssues(project_id, filter_string, 0, 9999)
-            except yt.YouTrackException as e:
-                continue
-            for issue in issues:
-                work_items = connection.getWorkItems(issue.id)
-                for item in work_items:
-                    item_date_string = datetime.datetime.utcfromtimestamp(int(item.date)/1000).strftime("%Y-%m-%d")
-                    if item.authorLogin == name \
-                            and from_date_string <= item_date_string <= to_date_string:
-                        report_items.append(item)
-    report_items.sort(key=lambda work_item: work_item.date)
-    previous_date = None
-    for item in report_items:
-        item_date = datetime.datetime.utcfromtimestamp(int(item.date)/1000)
-        current_date = item_date.strftime("%Y-%m-%d")
-        if not current_date == previous_date:
-            print("\n")
-            print(current_date)
-            previous_date = current_date
-        url_parts = item.url.split('/')
-        issue = "Unknown"
-        for i in range(0, len(url_parts)):
-            if url_parts[i] == "issue":
-                issue = url_parts[i+1]
-                break
-        message = [
-            item_date.strftime("%H:%M"),
-            issue,
-            str(datetime.timedelta(minutes=int(item.duration)))
-        ]
-        print("  " + " - ".join(message))
+    pass
 
 
 @youtrack.command()
@@ -181,33 +131,8 @@ def report(ctx, name, from_date_string, to_date_string):
 @click.option('-t', '--testing', is_flag=True)
 @click.pass_context
 def manictime(ctx, filename, testing):
+    pass
 
-    connection = ctx.obj['connection']
-
-    try:
-        rows = csv.DictReader(filename)
-        click.echo("Importing timeslips")
-    except csv.Error as e:
-        ctx.fail("Could not find file")
-
-    count = 0
-    total = 0
-    for row in rows:
-        total += 1
-        row = ManicTimeRow(connection, row)
-        if process_row(row):
-            # save
-            if not row.timeslip_exists():
-                count += 1
-                if not testing:
-                    row.save()
-                click.echo("  Uploaded timeslip for {0}".format(row.timeslip_string()))
-            else:
-                click.echo("  Timeslip for {0} ({1}) already exists".format(row.get_issue_id(), row.timeslip_string()))
-        else:
-            # ignore
-            click.echo("  Timeslip ignored")
-    click.echo("Added {0} timeslips out of {1}.".format(count, total))
 
 
 @youtrack.command()
@@ -218,105 +143,95 @@ def manictime(ctx, filename, testing):
 @click.pass_context
 def toggl(ctx, file, since, until, testing):
 
-    connection = ctx.obj['connection']
-    cfg = ctx.obj['config']
+    try:
+        connection = ctx.obj['create_connection'].create()
+    except yt.YouTrackException as e:
+        ctx.fail(e)
+
+    rows = list()
 
     if file:
-        row_class = TogglCsvRow
+        row_class = TogglCSVRow
         try:
             rows = csv.DictReader(file)
         except csv.Error as e:
             ctx.fail("Could not find file")
-        else:
-            click.echo("Importing timeslips")
     else:
-        row_class = TogglApiRow
-        url = "https://toggl.com/reports/api/v2/details"
+        row_class = TogglAPIRow
         params = dict()
+        url = "https://toggl.com/reports/api/v2/details"
         params['user_agent'] = "matt@outlandish.com"
-
         try:
-            params['since'] = date_parse(since).strftime("%Y-%m-%d")
-            params['until'] = date_parse(until).strftime("%Y-%m-%d")
-        except Exception as e:
-            ctx.fail(e)
-
-        try:
-            auth = (cfg.get('toggl', 'token'), 'api_token')
-            params['workspace_id'] = cfg.get('toggl', 'workspace')
-        except configparser.NoSectionError as e:
-            ctx.fail(e)
-        except configparser.NoOptionError as e:
-            ctx.fail(e)
+            token = ctx.obj['cfg'].get('toggl', 'token')
+            workspace_id = ctx.obj['cfg'].get('toggl', 'workspace')
+        except NoOptionError as e:
+            ctx.fail("No configuration set for connection to Toggl. "
+                   "Please add your api token and workspace id to the config by using the following commands:\n\n"
+                   "youtrack config add toggl.token <api_token>\n"
+                   "youtrack config add toggl.workspace <workspace_id>\n")
         else:
+            auth = (token, "api_token")
+            params['workspace_id'] = workspace_id
+
+            try:
+                params['since'] = process_datetime(since)
+            except TypeError:
+                ctx.fail("Could not create a date from --since option: {0}".format(since))
+
+            try:
+                params['until'] = process_datetime(until)
+            except TypeError:
+                ctx.fail("Could not create a date from --until option: {0}".format(until))
+
             try:
                 result = requests.get(url, auth=auth, params=params)
             except requests.ConnectionError as e:
-                ctx.fail(e)
-            except requests.HTTPError as e:
-                ctx.fail(e)
+                ctx.fail("Could not connect to Toggl. Error: {0}".format(e))
             else:
-                rows = result.json().get('data', [])
+                rows = result.json()['data']
 
-    total = 0
-    ignored = 0
-    timeslips = []
-    try:
-        rows
-    except NameError:
-        ctx.fail("Could not find any data to parse")
-    else:
-        total = len(rows)
-        for row in rows:
-            row = row_class(connection, row)
-            if process_row(row):
-                # save
-                if not row.timeslip_exists():
-                    timeslips.append(row)
-                else:
-                    ignored += 1
-                    click.echo("  Timeslip for {0} ({1}) already exists".format(row.get_issue_id(), row.timeslip_string()))
-            else:
-                # ignore
-                click.echo("  Timeslip ignored")
-                ignored += 1
-
-    count = 0
-    failed = 0
-    toggl_ids = list()
-    if not testing:
-        for timeslip in timeslips:
+    for row in rows:
+        row = row_class(row, connection)
+        if row.is_ignored():
+            click.echo("\nIgnored: Time Entry for {0}".format(row.__str__()))
+            continue
+        while True:
+            if row.work_item_exists():
+                click.echo("\nDuplicate: Time Entry for {0}".format(row.__str__()))
+                break
             try:
-                timeslip.save()
+                row.save_work_item()
+            except YoutrackIssueNotFoundException as e:
+                click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                click.echo("  Error: No Issue found or Issue Id incorrect\n")
+                issue_id = click.prompt("  Please provide the correct Issue Id [leave blank to ignore]:")
+                if not issue_id:
+                    click.echo("\nIgnored: Time Entry for {0}".format(row.__str__()))
+                    break
+                row.issue_id = issue_id
+            except YoutrackMissingConnectionException as e:
+                click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                ctx.fail("  Error: YouTrack connection is missing method to create Time Entry")
             except yt.YouTrackException as e:
-                click.echo("Could not upload timeslip for {0}".format(timeslip.get_issue_id()))
-                click.echo(e)
-                failed += 1
+                click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                ctx.fail("  Error: Unable to connect to YouTrack")
+            except YoutrackWorkItemIncorrectException as e:
+                click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                ctx.fail("  Error: Unable to create Time Entry. Missing important properties")
             else:
-                count += 1
-                if 'id' in timeslip.data:
-                    toggl_ids.append(timeslip.get_toggl_id())
-                click.echo("  Uploaded timeslip for {0}".format(timeslip.timeslip_string()))
-    else:
-        for timeslip in timeslips:
-            click.echo("  Uploaded timeslip for {0}".format(timeslip.timeslip_string()))
+                click.echo("\nCreated: Time Entry for {0}".format(row.__str__()))
+                break
 
+
+def process_datetime(date_string):
+    cal = Calendar()
     try:
-        auth
-    except NameError:
-        pass
-    else:
-        time_entry = json.dumps({"time_entry": {
-            "tags": ["Youtracked"],
-            "tag_action": "add"
-        }})
-        update_url = "https://www.toggl.com/api/v8/time_entries/{0}".format(",".join(str(x) for x in toggl_ids))
-        requests.put(update_url, auth=auth, data=time_entry)
+        dt = date_parse(date_string)
+    except TypeError:
+        dt = cal.nlp(date_string)[0][0]
+    return dt
 
-    click.echo("{total} timeslips were processed".format(total=total))
-    click.echo("{count} timeslips were successfully uploaded".format(count=count))
-    click.echo("{ignored} timeslips were ignored".format(ignored=ignored))
-    click.echo("{failed} timeslips failed and could not be uploaded".format(failed=failed))
+
 
 
 def process_row(row):
