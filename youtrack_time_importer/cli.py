@@ -218,15 +218,18 @@ def process_rows(rows, row_class, ctx):
         created = 0
         duplicate = 0
         error = 0
+
+        click.echo("\nProcessing {0} time entries. Please wait\n".format(total))
+
         for row in rows:
             row = row_class(row, connection)
             if row.is_ignored():
-                click.echo("\nIgnored: Time Entry for {0}".format(row.__str__()))
+                click.echo("Ignored: Time Entry for {0}\n".format(row.__str__()))
                 ignored += 1
                 continue
             while True:
                 if row.work_item_exists():
-                    click.echo("\nDuplicate: Time Entry for {0}".format(row.__str__()))
+                    click.echo("Duplicate: Time Entry for {0}\n".format(row.__str__()))
                     duplicate += 1
                     break
                 try:
@@ -236,7 +239,7 @@ def process_rows(rows, row_class, ctx):
                     click.echo("  Error: No Issue found or Issue Id incorrect\n")
                     issue_id = click.prompt("  Please provide the correct Issue Id [leave blank to ignore]:")
                     if not issue_id:
-                        click.echo("\nIgnored: Time Entry for {0}".format(row.__str__()))
+                        click.echo("Ignored: Time Entry for {0}\n".format(row.__str__()))
                         ignored += 1
                         break
                     row.issue_id = issue_id
@@ -248,11 +251,11 @@ def process_rows(rows, row_class, ctx):
                     ctx.fail("  Error: Unable to connect to YouTrack")
                 except YoutrackWorkItemIncorrectException as e:
                     click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
-                    click.echo("  Error: Unable to create Time Entry. Missing important properties")
+                    click.echo("  Error: Unable to create Time Entry. Missing important properties\n")
                     error += 1
                     break
                 else:
-                    click.echo("\nCreated: Time Entry for {0}".format(row.__str__()))
+                    click.echo("Created: Time Entry for {0}\n".format(row.__str__()))
                     created += 1
                     break
         click.echo("Processed {0} time entries.".format(total))
