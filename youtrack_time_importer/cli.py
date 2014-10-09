@@ -71,13 +71,14 @@ def youtrack(ctx, url, username, password):
     cfg = read_config()
     ctx.obj['cfg'] = cfg
 
-    try:
-        ctx.obj['create_connection'] = CreateConnection(url, username, password, cfg)
-    except NoOptionError as e:
-        ctx.fail("No configuration set for connection to YouTrack. "
-                   "Please add your url and username to the config by using the following commands:\n\n"
-                   "youtrack config add connection.username <username>\n"
-                   "youtrack config add connection.url <url>\n")
+    if ctx.invoked_subcommand != 'config':
+        try:
+            ctx.obj['create_connection'] = CreateConnection(url, username, password, cfg)
+        except NoOptionError as e:
+            ctx.fail("No configuration set for connection to YouTrack. "
+                       "Please add your url and username to the config by using the following commands:\n\n"
+                       "youtrack config add connection.username <username>\n"
+                       "youtrack config add connection.url <url>\n")
 
 
 @youtrack.group(invoke_without_command=True)
@@ -213,7 +214,11 @@ def process_rows(rows, row_class, ctx):
     except yt.YouTrackException as e:
         ctx.fail(e)
     else:
-        total = len(rows)
+        try:
+            total = len(rows)
+        except TypeError as e:
+            rows_temp = list(rows)
+            total = len(rows_temp)
         ignored = 0
         created = 0
         duplicate = 0
