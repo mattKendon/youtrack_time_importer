@@ -10,16 +10,13 @@ from youtrack_time_importer.row import ManictimeRow
 from youtrack_time_importer.row import YoutrackIssueNotFoundException
 from youtrack_time_importer.row import YoutrackMissingConnectionException
 from youtrack_time_importer.row import YoutrackWorkItemIncorrectException
+from youtrack_time_importer.date_range_enum import DateRangeEnum
 import click
 import configparser
 import csv
-import datetime
 import os
 import requests
 import youtrack as yt
-
-
-yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
 
 
 def config_path():
@@ -144,10 +141,11 @@ def manictime(ctx, file):
 
 @youtrack.command()
 @click.argument('file', type=click.File('rU', 'utf-8-sig'), required=False)
-@click.option('-s', '--since', type=click.STRING, default=yesterday)
-@click.option('-u', '--until', type=click.STRING, default=yesterday)
+@click.option('-s', '--since', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
+@click.option('-u', '--until', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
+@click.option('-r', '--range', type=click.Choice([name for name, member in DateRangeEnum.__members__.items()]))
 @click.pass_context
-def toggl(ctx, file, since, until):
+def toggl(ctx, file, since, until, range):
 
     rows = list()
 
@@ -174,15 +172,20 @@ def toggl(ctx, file, since, until):
             auth = (token, "api_token")
             params['workspace_id'] = workspace_id
 
-            try:
-                params['since'] = process_datetime(since)
-            except TypeError:
-                ctx.fail("Could not create a date from --since option: {0}".format(since))
+            if range:
+                times = [member for name, member in DateRangeEnum.__members__.items() if name == range]
+                params['since'] = times[0].since()
+                params['until'] = times[0].until()
+            else:
+                try:
+                    params['until'] = process_datetime(until)
+                except TypeError:
+                    ctx.fail("Could not create a date from --until option: {0}".format(until))
 
-            try:
-                params['until'] = process_datetime(until)
-            except TypeError:
-                ctx.fail("Could not create a date from --until option: {0}".format(until))
+                try:
+                    params['since'] = process_datetime(since)
+                except TypeError:
+                    ctx.fail("Could not create a date from --since option: {0}".format(since))
 
             try:
                 result = requests.get(url, auth=auth, params=params)
