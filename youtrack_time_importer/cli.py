@@ -213,14 +213,21 @@ def process_rows(rows, row_class, ctx):
     except yt.YouTrackException as e:
         ctx.fail(e)
     else:
+        total = len(rows)
+        ignored = 0
+        created = 0
+        duplicate = 0
+        error = 0
         for row in rows:
             row = row_class(row, connection)
             if row.is_ignored():
                 click.echo("\nIgnored: Time Entry for {0}".format(row.__str__()))
+                ignored += 1
                 continue
             while True:
                 if row.work_item_exists():
                     click.echo("\nDuplicate: Time Entry for {0}".format(row.__str__()))
+                    duplicate += 1
                     break
                 try:
                     row.save_work_item()
@@ -230,6 +237,7 @@ def process_rows(rows, row_class, ctx):
                     issue_id = click.prompt("  Please provide the correct Issue Id [leave blank to ignore]:")
                     if not issue_id:
                         click.echo("\nIgnored: Time Entry for {0}".format(row.__str__()))
+                        ignored += 1
                         break
                     row.issue_id = issue_id
                 except YoutrackMissingConnectionException as e:
@@ -240,10 +248,18 @@ def process_rows(rows, row_class, ctx):
                     ctx.fail("  Error: Unable to connect to YouTrack")
                 except YoutrackWorkItemIncorrectException as e:
                     click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
-                    ctx.fail("  Error: Unable to create Time Entry. Missing important properties")
+                    click.echo("  Error: Unable to create Time Entry. Missing important properties")
+                    error += 1
+                    break
                 else:
                     click.echo("\nCreated: Time Entry for {0}".format(row.__str__()))
+                    created += 1
                     break
+        click.echo("Processed {0} time entries.".format(total))
+        click.echo("  Ignored: {0}.".format(ignored))
+        click.echo("  Error: {0}.".format(error))
+        click.echo("  Duplicate: {0}.".format(duplicate))
+        click.echo("  Created: {0}.".format(created))
 
 if __name__ == "__main__":
     youtrack()
