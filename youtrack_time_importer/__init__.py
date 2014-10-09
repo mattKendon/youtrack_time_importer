@@ -6,6 +6,8 @@ import csv
 import datetime
 import re
 import youtrack
+import requests
+import json
 
 
 class Row(object):
@@ -226,7 +228,8 @@ class Row(object):
         if issue_id and timeslip:
             return self.connection.createWorkItem(issue_id, timeslip)
         else:
-            return False
+            # todo: make an exception for this
+            raise Exception("Something goes here")
 
     def timeslip_string(self):
         string_list = [
@@ -293,6 +296,10 @@ class TogglApiRow(Row):
 
     def get_tags(self):
         return ", ".join(self.get_field('tags'))
+
+    def get_toggl_id(self):
+        return self.get_field('id')
+
 
 
 if __name__ == '__main__':
