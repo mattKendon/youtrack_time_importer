@@ -71,7 +71,7 @@ def youtrack(ctx, url, username, password):
     cfg = read_config()
     ctx.obj['cfg'] = cfg
 
-    if ctx.invoked_subcommand != 'config':
+    if 'config' != ctx.invoked_subcommand:
         try:
             ctx.obj['create_connection'] = CreateConnection(url, username, password, cfg)
         except NoOptionError as e:
