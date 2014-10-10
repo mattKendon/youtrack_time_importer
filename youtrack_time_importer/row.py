@@ -278,7 +278,7 @@ class TogglAPIRow(Row):
         return datetime.datetime.strptime(start, self.datetime_format)
 
     def save_work_item(self):
-        # super().save_work_item()
+        super().save_work_item()
         cls = type(self)
         cls.ids = self.data.get('id')
 
