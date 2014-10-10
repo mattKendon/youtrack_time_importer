@@ -136,7 +136,7 @@ def manictime(ctx, file):
     except csv.Error as e:
         ctx.fail("Could not find file")
     else:
-        process_rows(rows, row_class, ctx)
+        process_rows(list(rows), row_class, ctx)
 
 
 
@@ -217,8 +217,8 @@ def process_rows(rows, row_class, ctx):
         try:
             total = len(rows)
         except TypeError as e:
-            rows_temp = list(rows)
-            total = len(rows_temp)
+            click.echo("Could not get total number of rows.")
+            total = 0
         ignored = 0
         created = 0
         duplicate = 0
