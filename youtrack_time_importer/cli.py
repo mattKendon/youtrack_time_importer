@@ -14,6 +14,7 @@ from youtrack_time_importer.date_range_enum import DateRangeEnum
 import click
 import configparser
 import csv
+import json
 import os
 import requests
 import youtrack as yt
@@ -196,6 +197,15 @@ def toggl(ctx, file, since, until, range):
                 rows = result.json()['data']
 
     process_rows(rows, row_class, ctx)
+
+    if len(row_class.ids) and row_class == TogglAPIRow:
+        ids = [str(id) for id in row_class.ids]
+        url = "https://www.toggl.com/api/v8/time_entries/{0}".format(",".join(ids))
+        data = {"time_entry": {"tags": ["youtracked"], "tag_action": "add"}}
+        try:
+            requests.put(url, auth=auth, data=json.dumps(data))
+        except requests.ConnectionError as e:
+            ctx.fail("Could not update Toggl: {0}".format(e))
 
 
 def process_datetime(date_string):

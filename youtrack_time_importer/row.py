@@ -5,7 +5,17 @@ import datetime
 import re
 
 
-class Row(metaclass=abc.ABCMeta):
+class MetaRow(abc.ABCMeta):
+    _ids = set()
+    @property
+    def ids(cls):
+        return cls._ids
+    @ids.setter
+    def ids(cls, value):
+        cls._ids.add(value)
+
+
+class Row(metaclass=MetaRow):
     """abstract class to handle a row of data from a CSV or API call"""
 
     issue_finder = re.compile('(?P<issue_id>[a-zA-Z0-9]*\-[0-9]+)', flags=re.IGNORECASE)
@@ -266,6 +276,11 @@ class TogglAPIRow(Row):
 
         start = self.data.get('start').split("+")[0]
         return datetime.datetime.strptime(start, self.datetime_format)
+
+    def save_work_item(self):
+        # super().save_work_item()
+        cls = type(self)
+        cls.ids = self.data.get('id')
 
 
 class YoutrackIssueNotFoundException(Exception):
