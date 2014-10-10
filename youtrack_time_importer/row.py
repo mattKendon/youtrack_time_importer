@@ -115,6 +115,9 @@ class Row(metaclass=MetaRow):
             work_items = self.connection.getWorkItems(self.issue_id)
         except YouTrackException as e:
             return False
+        except TypeError as e:
+            # no issue id
+            return False
         else:
             for work_item in work_items:
                 if (work_item.authorLogin == self.connection.login and
@@ -149,6 +152,8 @@ class Row(metaclass=MetaRow):
                 raise YoutrackMissingConnectionException()
             else:
                 raise YoutrackWorkItemIncorrectException()
+        except TypeError as te:
+            raise YoutrackIssueNotFoundException
         except YouTrackException as e:
             raise YoutrackIssueNotFoundException
 
@@ -194,6 +199,10 @@ class ManictimeRow(Row):
             return match.group('issue_id')
         except AttributeError as e:
             return False
+
+    def save_work_item(self):
+        # super().save_work_item()
+        pass
 
 
 class TogglCSVRow(Row):
