@@ -200,10 +200,6 @@ class ManictimeRow(Row):
         except AttributeError as e:
             return False
 
-    def save_work_item(self):
-        # super().save_work_item()
-        pass
-
 
 class TogglCSVRow(Row):
     datetime_format = "%Y-%m-%d %H:%M:%S"

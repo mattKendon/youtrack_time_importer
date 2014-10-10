@@ -252,7 +252,7 @@ def process_rows(rows, row_class, ctx):
                 except YoutrackIssueNotFoundException as e:
                     click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
                     click.echo("  Error: No Issue found or Issue Id incorrect\n")
-                    issue_id = click.prompt("  Please provide the correct Issue Id [leave blank to ignore]:")
+                    issue_id = click.prompt("  Please provide the correct Issue Id [leave blank to ignore]")
                     if not issue_id:
                         click.echo("Ignored: Time Entry for {0}\n".format(row.__str__()))
                         ignored += 1
