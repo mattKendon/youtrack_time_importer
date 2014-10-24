@@ -252,12 +252,11 @@ def process_rows(rows, row_class, ctx):
                 except YoutrackIssueNotFoundException as e:
                     click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
                     click.echo("  Error: No Issue found or Issue Id incorrect\n")
-                    issue_id = click.prompt("  Please provide the correct Issue Id [leave blank to ignore]")
-                    if not issue_id:
+                    if click.confirm("  Do you wish to ignore this issue?"):
                         click.echo("Ignored: Time Entry for {0}\n".format(row.__str__()))
                         ignored += 1
                         break
-                    row.issue_id = issue_id
+                    row.issue_id = click.prompt("  Please provide the correct Issue Id")
                 except YoutrackMissingConnectionException as e:
                     click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
                     ctx.fail("  Error: YouTrack connection is missing method to create Time Entry")
