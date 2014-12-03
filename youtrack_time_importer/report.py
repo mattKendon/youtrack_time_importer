@@ -11,12 +11,10 @@ class Report(object):
         self.end_date = end_date
         self.work_items = []
 
-    def report(self):
+    def process(self):
         issues = self.get_issues()
         for issue in issues:
             self.work_items += self.get_work_items(issue)
-        for work_item in self.work_items:
-            self.process_work_item(work_item)
 
     def get_issues(self):
         return self.conn.getIssues()
@@ -26,5 +24,22 @@ class Report(object):
                 if w.user == self.user and
                 self.end_date > w.date > self.start_date]
 
-    def process_work_item(self, work_item):
-        pass
+    def report_day(self, day):
+        return DayReport(day, self.work_items)
+
+
+class DayReport(object):
+
+    def __init__(self, day, work_items):
+        self.day = day
+        self.work_items = [w for w in work_items if w.date == day]
+        self.issues = {}
+        self.process_work_items()
+
+    def process_work_items(self):
+        for work_item in self.work_items:
+            pass
+
+
+class IssueReport(object):
+    pass
