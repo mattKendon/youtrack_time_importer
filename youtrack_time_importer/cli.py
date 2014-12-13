@@ -3,8 +3,7 @@ __author__ = 'Matthew'
 import os
 import click
 from dateutil.parser import parse as date_parse
-import datetime
-from youtrack.connection import Connection
+from youtrack_time_importer.yt.connection import Connection
 import csv
 import youtrack as yt
 from youtrack_time_importer import ManicTimeRow
@@ -12,6 +11,7 @@ from youtrack_time_importer import TogglRow
 import configparser
 from configparser import NoOptionError
 from requests.exceptions import ConnectionError
+from youtrack_time_importer.report import Report
 
 
 def config_path():
@@ -118,56 +118,17 @@ def add(ctx, option, value):
 def report(ctx, name, from_date_string, to_date_string):
 
     try:
-        from_date_string = date_parse(from_date_string).strftime("%Y-%m-%d")
-        to_date_string = date_parse(to_date_string).strftime("%Y-%m-%d")
-    except:
+        from_date = date_parse(from_date_string)
+        to_date = date_parse(to_date_string)
+    except Exception as e:
         ctx.fail("Could not convert one or more date strings. "
                  "Please use a recognised format such as YYYY-MM-DD")
+    else:
+        connection = ctx.obj['connection']
+        report = Report(connection, name, from_date, to_date)
 
-    #get connection to youtrack
-    connection = ctx.obj['connection']
+        report.print()
 
-    #filter string
-    filter_string = ""
-
-    #get project ids and loop through them
-    project_ids = connection.getProjectIds()
-    report_items = []
-    click.echo("Searching {0} projects for tasks that you've worked on".format(len(project_ids)))
-    with click.progressbar(project_ids) as bar:
-        for project_id in bar:
-            try:
-                issues = connection.getIssues(project_id, filter_string, 0, 9999)
-            except yt.YouTrackException as e:
-                continue
-            for issue in issues:
-                work_items = connection.getWorkItems(issue.id)
-                for item in work_items:
-                    item_date_string = datetime.datetime.utcfromtimestamp(int(item.date)/1000).strftime("%Y-%m-%d")
-                    if item.authorLogin == name \
-                            and from_date_string <= item_date_string <= to_date_string:
-                        report_items.append(item)
-    report_items.sort(key=lambda work_item: work_item.date)
-    previous_date = None
-    for item in report_items:
-        item_date = datetime.datetime.utcfromtimestamp(int(item.date)/1000)
-        current_date = item_date.strftime("%Y-%m-%d")
-        if not current_date == previous_date:
-            print("\n")
-            print(current_date)
-            previous_date = current_date
-        url_parts = item.url.split('/')
-        issue = "Unknown"
-        for i in range(0, len(url_parts)):
-            if url_parts[i] == "issue":
-                issue = url_parts[i+1]
-                break
-        message = [
-            item_date.strftime("%H:%M"),
-            issue,
-            str(datetime.timedelta(minutes=int(item.duration)))
-        ]
-        print("  " + " - ".join(message))
 
 
 @youtrack.command()
