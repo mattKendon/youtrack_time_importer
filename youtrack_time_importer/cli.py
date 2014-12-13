@@ -1,22 +1,18 @@
 __author__ = 'Matthew'
 
-from configparser import NoOptionError
-from dateutil.parser import parse as date_parse
-from parsedatetime import Calendar
-from youtrack.connection import Connection
-from youtrack_time_importer.row import TogglCSVRow
-from youtrack_time_importer.row import TogglAPIRow
-from youtrack_time_importer.row import ManictimeRow
-from youtrack_time_importer.row import YoutrackIssueNotFoundException
-from youtrack_time_importer.row import YoutrackMissingConnectionException
-from youtrack_time_importer.row import YoutrackWorkItemIncorrectException
-from youtrack_time_importer.date_range_enum import DateRangeEnum
-import click
-import configparser
-import csv
 import os
-import requests
+import click
+from dateutil.parser import parse as date_parse
+import datetime
+from youtrack.connection import Connection
+import csv
 import youtrack as yt
+from youtrack_time_importer import ManicTimeRow
+from youtrack_time_importer import TogglRow
+import configparser
+from configparser import NoOptionError
+from requests.exceptions import ConnectionError
+from youtrack_time_importer.report import Report
 
 
 def config_path():
@@ -122,6 +118,19 @@ def add(ctx, option, value):
 def report(ctx, name, from_date_string, to_date_string):
     click.echo("Coming Soon!")
     exit()
+
+    try:
+        from_date = date_parse(from_date_string)
+        to_date = date_parse(to_date_string)
+    except Exception as e:
+        ctx.fail("Could not convert one or more date strings. "
+                 "Please use a recognised format such as YYYY-MM-DD")
+    else:
+        connection = ctx.obj['connection']
+        report = Report(connection, name, from_date, to_date)
+
+        report.print()
+
 
 
 @youtrack.command()
