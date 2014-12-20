@@ -1,11 +1,13 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
+from youtrack import WorkItem
+from youtrack import YouTrackException
+
 from youtrack_time_importer.row import ManictimeRow
 from youtrack_time_importer.row import YoutrackMissingConnectionException
 from youtrack_time_importer.row import YoutrackWorkItemIncorrectException
 from youtrack_time_importer.row import YoutrackIssueNotFoundException
-from youtrack import WorkItem
-from youtrack import YouTrackException
+
 
 __author__ = 'Matthew'
 
