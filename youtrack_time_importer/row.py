@@ -18,7 +18,7 @@ class MetaRow(abc.ABCMeta):
 class Row(metaclass=MetaRow):
     """abstract class to handle a row of data from a CSV or API call"""
 
-    issue_finder = re.compile('(?P<issue_id>[a-zA-Z0-9]*\-[0-9]+)', flags=re.IGNORECASE)
+    issue_finder = re.compile('^(?P<issue_id>[a-zA-Z0-9_]+\-[0-9]+)', flags=re.IGNORECASE)
 
     @abc.abstractproperty
     def datetime_format(self):
@@ -70,9 +70,10 @@ class Row(metaclass=MetaRow):
     def __str__(self):
         pass
 
-    def __init__(self, data, connection):
+    def __init__(self, data, connection, username):
         self.data = data
         self.connection = connection
+        self.username = username
         self._issue_id = None
         self._work_item = None
 
@@ -120,7 +121,7 @@ class Row(metaclass=MetaRow):
             return False
         else:
             for work_item in work_items:
-                if (work_item.authorLogin == self.connection.login and
+                if (work_item.authorLogin == self.username and
                         work_item.date == self.work_item.date and
                         work_item.duration == self.work_item.duration):
                     return True
@@ -264,7 +265,7 @@ class TogglAPIRow(Row):
         description = self.data.get("description")
         time = self.start_datetime().strftime("%H:%M")
         date = self.start_datetime().strftime("%d/%m/%y")
-        return "{d} - {t} {dt}".format(d=description, t=time, dt=date)
+        return "[{dt} @ {t}] {d}".format(d=description, t=time, dt=date)
 
     def is_ignored(self):
         return "ignore" in self.data.get("tags")
