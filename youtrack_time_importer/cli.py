@@ -147,7 +147,21 @@ def manictime(ctx, file):
 @click.option('-u', '--until', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
 @click.option('-r', '--range', type=click.Choice([name for name, member in DateRangeEnum.__members__.items()]))
 @click.pass_context
+def toggle(ctx, file, since, until, range):
+    toggl_common(ctx, file, since, until, range)
+
+
+@youtrack.command()
+@click.argument('file', type=click.File('rU', 'utf-8-sig'), required=False)
+@click.option('-s', '--since', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
+@click.option('-u', '--until', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
+@click.option('-r', '--range', type=click.Choice([name for name, member in DateRangeEnum.__members__.items()]))
+@click.pass_context
 def toggl(ctx, file, since, until, range):
+    toggl_common(ctx, file, since, until, range)
+
+
+def toggl_common(ctx, file, since, until, range):
 
     rows = list()
 
@@ -220,7 +234,12 @@ def process_datetime(date_string):
 def process_rows(rows, row_class, ctx):
 
     try:
-        connection = ctx.obj['create_connection'].create()
+        connection_manager = ctx.obj['create_connection']
+        connection = connection_manager.create()
+        """ get the login for the current user (may have used email to login with) """
+        userXml = connection._get('/user/current')
+        userNode = userXml.getElementsByTagName('user')
+        login = userNode[0].attributes['login'].value
     except yt.YouTrackException as e:
         ctx.fail(e)
     else:
@@ -237,39 +256,40 @@ def process_rows(rows, row_class, ctx):
         click.echo("\nProcessing {0} time entries. Please wait\n".format(total))
 
         for row in rows:
-            row = row_class(row, connection)
+            row = row_class(row, connection, login)
+            row_string = row.__str__()
             if row.is_ignored():
-                click.echo("Ignored: Time Entry for {0}\n".format(row.__str__()))
+                click.echo("Ignored: Time Entry for {0}\n".format(row_string))
                 ignored += 1
                 continue
             while True:
                 if row.work_item_exists():
-                    click.echo("Duplicate: Time Entry for {0}\n".format(row.__str__()))
+                    click.echo("Duplicate: Time Entry for {0}\n".format(row_string))
                     duplicate += 1
                     break
                 try:
                     row.save_work_item()
                 except YoutrackIssueNotFoundException as e:
-                    click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                    click.echo("Could not upload Time Entry for {0}".format(row_string))
                     click.echo("  Error: No Issue found or Issue Id incorrect\n")
                     if click.confirm("  Do you wish to ignore this issue?"):
-                        click.echo("Ignored: Time Entry for {0}\n".format(row.__str__()))
+                        click.echo("Ignored: Time Entry for {0}\n".format(row_string))
                         ignored += 1
                         break
                     row.issue_id = click.prompt("  Please provide the correct Issue Id")
                 except YoutrackMissingConnectionException as e:
-                    click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                    click.echo("Could not upload Time Entry for {0}".format(row_string))
                     ctx.fail("  Error: YouTrack connection is missing method to create Time Entry")
                 except yt.YouTrackException as e:
-                    click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                    click.echo("Could not upload Time Entry for {0}".format(row_string))
                     ctx.fail("  Error: Unable to connect to YouTrack")
                 except YoutrackWorkItemIncorrectException as e:
-                    click.echo("Could not upload Time Entry for {0}".format(row.__str__()))
+                    click.echo("Could not upload Time Entry for {0}".format(row_string))
                     click.echo("  Error: Unable to create Time Entry. Missing important properties\n")
                     error += 1
                     break
                 else:
-                    click.echo("Created: Time Entry for {0}\n".format(row.__str__()))
+                    click.echo("Created: Time Entry for {0}\n".format(row_string))
                     created += 1
                     break
         click.echo("Processed {0} time entries.".format(total))
