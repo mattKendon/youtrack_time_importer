@@ -265,7 +265,7 @@ class TogglAPIRow(Row):
         description = self.data.get("description")
         time = self.start_datetime().strftime("%H:%M")
         date = self.start_datetime().strftime("%d/%m/%y")
-        return "{d} - {t} {dt}".format(d=description, t=time, dt=date)
+        return "[{dt} @ {t}] {d}".format(d=description, t=time, dt=date)
 
     def is_ignored(self):
         return "ignore" in self.data.get("tags")
