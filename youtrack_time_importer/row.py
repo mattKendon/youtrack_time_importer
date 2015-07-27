@@ -5,10 +5,20 @@ import datetime
 import re
 
 
-class Row(metaclass=abc.ABCMeta):
+class MetaRow(abc.ABCMeta):
+    _ids = set()
+    @property
+    def ids(cls):
+        return cls._ids
+    @ids.setter
+    def ids(cls, value):
+        cls._ids.add(value)
+
+
+class Row(metaclass=MetaRow):
     """abstract class to handle a row of data from a CSV or API call"""
 
-    issue_finder = re.compile('(?P<issue_id>[a-zA-Z0-9]*\-[0-9]+)', flags=re.IGNORECASE)
+    issue_finder = re.compile('^(?P<issue_id>[a-zA-Z0-9_]+\-[0-9]+)', flags=re.IGNORECASE)
 
     @abc.abstractproperty
     def datetime_format(self):
@@ -60,9 +70,10 @@ class Row(metaclass=abc.ABCMeta):
     def __str__(self):
         pass
 
-    def __init__(self, data):
+    def __init__(self, data, connection, username):
         self.data = data
-        self.connection = None
+        self.connection = connection
+        self.username = username
         self._issue_id = None
         self._work_item = None
 
@@ -85,6 +96,67 @@ class Row(metaclass=abc.ABCMeta):
     @work_item.setter
     def work_item(self, value):
         self._work_item = value
+
+    def work_item_exists(self):
+        """Checks to see if WorkItem already exists
+
+        Gets all the WorkItems for an issue and checks to see if
+        once exists with the same date and duration. As date is a timestamp
+        based on date and time, this should be completely unique.
+
+        Returns:
+            Boolean value, returning True if it exists, and false if :
+            it doesn't
+
+        Raises:
+            A YoutrackIssueNotFoundException if issue doesnt exist on server
+        """
+
+        try:
+            work_items = self.connection.getWorkItems(self.issue_id)
+        except YouTrackException as e:
+            return False
+        except TypeError as e:
+            # no issue id
+            return False
+        else:
+            for work_item in work_items:
+                if (work_item.authorLogin == self.username and
+                        work_item.date == self.work_item.date and
+                        work_item.duration == self.work_item.duration):
+                    return True
+            return False
+
+    def save_work_item(self):
+        """Saves WorkItem to Youtrack
+
+        Uses the Youtrack Connection to save the WorkItem
+        to the issue, if it is determined that the issue ID
+        is correct.
+
+        Args:
+            work_item: A WorkItem object with description, duration
+            and date all set
+
+        Raises:
+            A YoutrackMissingConnectionException if the connection object
+            doesnt' have the method createWorkItem()
+            a YoutrackIssueNotFoundException if issue doesnt exist on server,
+            a YoutrackWorkItemIncorrectException if the work_item does not have
+            all attributes
+        """
+
+        try:
+            self.connection.createWorkItem(self.issue_id, self.work_item)
+        except AttributeError as ae:
+            if "createWorkItem" in ae.args[0]:
+                raise YoutrackMissingConnectionException()
+            else:
+                raise YoutrackWorkItemIncorrectException()
+        except TypeError as te:
+            raise YoutrackIssueNotFoundException
+        except YouTrackException as e:
+            raise YoutrackIssueNotFoundException
 
 
 class ManictimeRow(Row):
@@ -193,7 +265,7 @@ class TogglAPIRow(Row):
         description = self.data.get("description")
         time = self.start_datetime().strftime("%H:%M")
         date = self.start_datetime().strftime("%d/%m/%y")
-        return "{d} - {t} {dt}".format(d=description, t=time, dt=date)
+        return "[{dt} @ {t}] {d}".format(d=description, t=time, dt=date)
 
     def is_ignored(self):
         return "ignore" in self.data.get("tags")
@@ -210,6 +282,11 @@ class TogglAPIRow(Row):
 
         start = self.data.get('start').split("+")[0]
         return datetime.datetime.strptime(start, self.datetime_format)
+
+    def save_work_item(self):
+        super().save_work_item()
+        cls = type(self)
+        cls.ids = self.data.get('id')
 
 
 class YoutrackIssueNotFoundException(Exception):
