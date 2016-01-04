@@ -160,7 +160,7 @@ class Row(metaclass=MetaRow):
 
 
 class ManictimeRow(Row):
-    datetime_format = "%d/%m/%Y %H:%M:%S"
+    datetime_format = "%Y-%m-%d %H:%M:%S"
 
     def create_work_item(self):
         work_item = WorkItem()

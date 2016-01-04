@@ -128,8 +128,9 @@ def report(ctx, name, from_date_string, to_date_string):
 
 @youtrack.command()
 @click.argument('file', type=click.File('rU', 'utf-8-sig'))
+@click.option('-t', '--test', is_flag=True)
 @click.pass_context
-def manictime(ctx, file):
+def manictime(ctx, file, test):
 
     row_class = ManictimeRow
     try:
@@ -137,18 +138,7 @@ def manictime(ctx, file):
     except csv.Error as e:
         ctx.fail("Could not find file")
     else:
-        process_rows(list(rows), row_class, ctx)
-
-
-
-@youtrack.command()
-@click.argument('file', type=click.File('rU', 'utf-8-sig'), required=False)
-@click.option('-s', '--since', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
-@click.option('-u', '--until', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
-@click.option('-r', '--range', type=click.Choice([name for name, member in DateRangeEnum.__members__.items()]))
-@click.pass_context
-def toggle(ctx, file, since, until, range):
-    toggl_common(ctx, file, since, until, range)
+        process_rows(list(rows), row_class, ctx, test)
 
 
 @youtrack.command()
@@ -156,12 +146,24 @@ def toggle(ctx, file, since, until, range):
 @click.option('-s', '--since', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
 @click.option('-u', '--until', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
 @click.option('-r', '--range', type=click.Choice([name for name, member in DateRangeEnum.__members__.items()]))
+@click.option('-t', '--test', is_flag=True)
 @click.pass_context
-def toggl(ctx, file, since, until, range):
-    toggl_common(ctx, file, since, until, range)
+def toggle(ctx, file, since, until, range, test):
+    toggl_common(ctx, file, since, until, range, test)
 
 
-def toggl_common(ctx, file, since, until, range):
+@youtrack.command()
+@click.argument('file', type=click.File('rU', 'utf-8-sig'), required=False)
+@click.option('-s', '--since', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
+@click.option('-u', '--until', type=click.STRING, default=DateRangeEnum.yesterday.until().format("%Y-%m-%d"))
+@click.option('-r', '--range', type=click.Choice([name for name, member in DateRangeEnum.__members__.items()]))
+@click.option('-t', '--test', is_flag=True)
+@click.pass_context
+def toggl(ctx, file, since, until, range, test):
+    toggl_common(ctx, file, since, until, range, test)
+
+
+def toggl_common(ctx, file, since, until, range, test):
 
     rows = list()
 
@@ -210,7 +212,7 @@ def toggl_common(ctx, file, since, until, range):
             else:
                 rows = result.json()['data']
 
-    process_rows(rows, row_class, ctx)
+    process_rows(rows, row_class, ctx, test)
 
     if len(row_class.ids) and row_class == TogglAPIRow:
         ids = [str(id) for id in row_class.ids]
@@ -231,7 +233,7 @@ def process_datetime(date_string):
     return dt
 
 
-def process_rows(rows, row_class, ctx):
+def process_rows(rows, row_class, ctx, test=False):
 
     try:
         connection_manager = ctx.obj['create_connection']
@@ -268,7 +270,8 @@ def process_rows(rows, row_class, ctx):
                     duplicate += 1
                     break
                 try:
-                    row.save_work_item()
+                    if not test:
+                        row.save_work_item()
                 except YoutrackIssueNotFoundException as e:
                     click.echo("Could not upload Time Entry for {0}".format(row_string))
                     click.echo("  Error: No Issue found or Issue Id incorrect\n")

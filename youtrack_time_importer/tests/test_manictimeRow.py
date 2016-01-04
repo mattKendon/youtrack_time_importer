@@ -23,7 +23,7 @@ class TestTogglAPIRow(TestCase):
         self.data = {
             'Description': 'BCSM-15 Support new presences in code',
             'Duration': "3:24:54",
-            'Start date': '06/10/2014',
+            'Start date': '2014-10-06',
             'Start time': '15:05:00',
             'Email': 'test@test.org'
         }
