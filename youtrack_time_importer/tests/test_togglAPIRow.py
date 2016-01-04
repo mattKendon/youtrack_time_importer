@@ -42,7 +42,7 @@ class TestTogglAPIRow(TestCase):
             'uid': 907967
         }
         connection = MagicMock()
-        self.row = TogglAPIRow(self.data, connection)
+        self.row = TogglAPIRow(self.data, connection, 'username')
 
     def test_work_item(self):
         work_item = self.row.work_item

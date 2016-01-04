@@ -165,7 +165,7 @@ class ManictimeRow(Row):
     def create_work_item(self):
         work_item = WorkItem()
 
-        description = self.data.get('Notes')
+        description = self.data.get('Notes', self.data.get('Description', ""))
         duration = self.duration_as_minutes()
         date = round(self.start_datetime().timestamp()*1000)
 
@@ -181,21 +181,22 @@ class ManictimeRow(Row):
 
     def start_datetime(self):
         """Return a datetime object representation of the start date and time"""
-
-        return datetime.datetime.strptime(self.data.get('Start'), self.datetime_format)
+        date_string = self.data.get('Start date')
+        time_string = self.data.get('Start time')
+        start_datetime_string = "{date} {time}".format(date=date_string, time=time_string)
+        return datetime.datetime.strptime(start_datetime_string, self.datetime_format)
 
     def __str__(self):
-        tags = self.data.get("Name")
-        description = self.data.get("Notes")
+        description = self.data.get("Description")
         time = self.start_datetime().strftime("%H:%M")
         date = self.start_datetime().strftime("%d/%m/%y")
-        return "{tags} / {d} - {t} {dt}".format(tags=tags, d=description, t=time, dt=date)
+        return "{d} - {t} {dt}".format(d=description, t=time, dt=date)
 
     def is_ignored(self):
-        return "ignore" in self.data.get("Name")
+        return "ignore" in self.data.get("Description")
 
     def find_issue_id(self):
-        match = self.issue_finder.search(self.data.get("Name"))
+        match = self.issue_finder.search(self.data.get("Description"))
         try:
             return match.group('issue_id')
         except AttributeError as e:
@@ -235,7 +236,7 @@ class TogglCSVRow(Row):
         return "{d} - {t} {dt}".format(d=description, t=time, dt=date)
 
     def is_ignored(self):
-        return "ignore" in self.data.get("Tags")
+        return "ignore" in self.data.get("Description")
 
     def find_issue_id(self):
         match = self.issue_finder.search(self.data.get("Description"))

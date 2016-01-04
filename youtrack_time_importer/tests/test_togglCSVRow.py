@@ -37,7 +37,7 @@ class TestTogglAPIRow(TestCase):
             'Amount ()': '0'
         }
         connection = MagicMock()
-        self.row = TogglCSVRow(self.data, connection)
+        self.row = TogglCSVRow(self.data, connection, 'username')
 
     def test_work_item(self):
         work_item = self.row.work_item

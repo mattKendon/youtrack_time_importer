@@ -21,39 +21,39 @@ def attribute_error(issue_id, work_item):
 class TestTogglAPIRow(TestCase):
     def setUp(self):
         self.data = {
-            'Name': 'BCSM, BCSM-15',
-            'Notes': 'Support new presences in code',
+            'Description': 'BCSM-15 Support new presences in code',
             'Duration': "3:24:54",
-            'End': '06/10/2014 18:29:54',
-            'Start': '06/10/2014 15:05:00',
+            'Start date': '06/10/2014',
+            'Start time': '15:05:00',
+            'Email': 'test@test.org'
         }
         connection = MagicMock()
-        self.row = ManictimeRow(self.data, connection)
+        self.row = ManictimeRow(self.data, connection, 'username')
 
     def test_work_item(self):
         work_item = self.row.work_item
         self.assertIsInstance(work_item, WorkItem)
-        self.assertEqual('Support new presences in code', work_item.description)
+        self.assertEqual('BCSM-15 Support new presences in code', work_item.description)
         self.assertEqual('205', work_item.duration)
         self.assertEqual('1412604300000', work_item.date)
 
     def test__str__(self):
-        self.assertEqual(self.row.__str__(), "BCSM, BCSM-15 / Support new presences in code - 15:05 06/10/14")
+        self.assertEqual(self.row.__str__(), "BCSM-15 Support new presences in code - 15:05 06/10/14")
 
     def test_is_ignored(self):
         self.assertFalse(self.row.is_ignored())
 
     def test_is_ignored_when_ignore_tag_is_present(self):
-        new_tags = self.row.data.get('Name').split(",")
+        new_tags = self.row.data.get('Description').split(",")
         new_tags.append("ignore")
-        self.row.data['Name'] = ",".join(new_tags)
+        self.row.data['Description'] = ",".join(new_tags)
         self.assertTrue(self.row.is_ignored())
 
     def test_issue_id(self):
         self.assertEqual('BCSM-15', self.row.issue_id)
 
     def test_issue_id_return_false_if_no_issue_id(self):
-        self.row.data['Name'] = "Nothing Here, See Nothing"
+        self.row.data['Description'] = "Nothing Here, See Nothing"
         self.assertFalse(self.row.issue_id)
 
     def test_save_work_item_raises_exception_if_no_connection(self):
@@ -67,7 +67,7 @@ class TestTogglAPIRow(TestCase):
 
     def test_save_work_item_raise_exception_if_issue_doesnt_exist(self):
         self.row.connection.createWorkItem = MagicMock(side_effect=YouTrackException("", mockResponse))
-        self.row.data['description'] = "Support new presences in code"
+        self.row.data['Description'] = "Support new presences in code"
         work_item = WorkItem()
         work_item.description = "Test Description"
         work_item.duration = "10"
